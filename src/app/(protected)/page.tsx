@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useActor } from "@/components/actor-provider";
 import { apiFetch } from "@/lib/client-api";
+import { buildLeadershipOverview } from "@/lib/leadership-overview";
 import { validateQuickLogInput } from "@/lib/quick-log-validation";
-import type { Employee, FeedbackLog, FeedbackType } from "@/lib/types";
+import type { Employee, FeedbackLog, FeedbackType, LeadershipAssessment } from "@/lib/types";
 
 const suggestionChips = [
   "회의 진행이 매우 좋았습니다.",
@@ -40,6 +41,7 @@ export default function DashboardPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [recentLogs, setRecentLogs] = useState<FeedbackLog[]>([]);
   const [monthlyLogs, setMonthlyLogs] = useState<FeedbackLog[]>([]);
+  const [latestLeadership, setLatestLeadership] = useState<LeadershipAssessment | null>(null);
 
   const [employeeId, setEmployeeId] = useState("");
   const [type, setType] = useState<FeedbackType | "">("coaching");
@@ -49,7 +51,6 @@ export default function DashboardPage() {
 
   const [feedType, setFeedType] = useState<"all" | FeedbackType>("all");
   const [feedPeriod, setFeedPeriod] = useState<"30" | "90" | "all">("30");
-  const [feedSort, setFeedSort] = useState<"latest" | "pinned">("latest");
   const [feedEmployeeId, setFeedEmployeeId] = useState("all");
   const [editing, setEditing] = useState<FeedbackLog | null>(null);
   const [nowTs] = useState(() => Date.now());
@@ -58,18 +59,24 @@ export default function DashboardPage() {
 
   const load = async () => {
     const employeeQuery = feedEmployeeId !== "all" ? `&employeeId=${feedEmployeeId}` : "";
-    const [membersRes, recentRes, monthlyRes] = await Promise.all([
+    const [membersRes, recentRes, monthlyRes, leadershipRes] = await Promise.all([
       apiFetch<{ items: Employee[] }>("/api/members"),
       apiFetch<{ items: FeedbackLog[] }>(
-        `/api/logs?period=${feedPeriod}&type=${feedType}&sort=${feedSort}${employeeQuery}`,
+        `/api/logs?period=${feedPeriod}&type=${feedType}&sort=latest${employeeQuery}`,
       ),
       apiFetch<{ items: FeedbackLog[] }>("/api/logs?period=30&type=all&sort=latest"),
+      actor?.id
+        ? apiFetch<{ items: LeadershipAssessment[] }>(
+            `/api/leadership-assessments?ownerUid=${encodeURIComponent(actor.id)}`,
+          )
+        : Promise.resolve({ items: [] as LeadershipAssessment[] }),
     ]);
     const activeMembers = membersRes.items.filter((e) => e.active);
     setEmployees(activeMembers);
     setEmployeeId((prev) => prev || activeMembers[0]?.id || "");
     setRecentLogs(recentRes.items.slice(0, 20));
     setMonthlyLogs(monthlyRes.items);
+    setLatestLeadership(leadershipRes.items[0] || null);
   };
 
   useEffect(() => {
@@ -77,12 +84,15 @@ export default function DashboardPage() {
     let cancelled = false;
     const loadInEffect = async () => {
       const employeeQuery = feedEmployeeId !== "all" ? `&employeeId=${feedEmployeeId}` : "";
-      const [membersRes, recentRes, monthlyRes] = await Promise.all([
+      const [membersRes, recentRes, monthlyRes, leadershipRes] = await Promise.all([
         apiFetch<{ items: Employee[] }>("/api/members"),
         apiFetch<{ items: FeedbackLog[] }>(
-          `/api/logs?period=${feedPeriod}&type=${feedType}&sort=${feedSort}${employeeQuery}`,
+          `/api/logs?period=${feedPeriod}&type=${feedType}&sort=latest${employeeQuery}`,
         ),
         apiFetch<{ items: FeedbackLog[] }>("/api/logs?period=30&type=all&sort=latest"),
+        apiFetch<{ items: LeadershipAssessment[] }>(
+          `/api/leadership-assessments?ownerUid=${encodeURIComponent(actor.id)}`,
+        ),
       ]);
       if (cancelled) return;
       const activeMembers = membersRes.items.filter((e) => e.active);
@@ -90,12 +100,18 @@ export default function DashboardPage() {
       setEmployeeId((prev) => prev || activeMembers[0]?.id || "");
       setRecentLogs(recentRes.items.slice(0, 20));
       setMonthlyLogs(monthlyRes.items);
+      setLatestLeadership(leadershipRes.items[0] || null);
     };
     void loadInEffect();
     return () => {
       cancelled = true;
     };
-  }, [actor, feedEmployeeId, feedPeriod, feedSort, feedType]);
+  }, [actor, feedEmployeeId, feedPeriod, feedType]);
+
+  const leadershipOverview = useMemo(
+    () => buildLeadershipOverview(latestLeadership),
+    [latestLeadership],
+  );
 
   const coverage = useMemo(() => {
     return employees.map((e) => {
@@ -273,12 +289,45 @@ export default function DashboardPage() {
               <p className="rounded bg-slate-50 p-2 text-slate-700">⚠ 개선: {summary.improve}</p>
             </div>
           </div>
+
+          <div className="rounded-xl border bg-white p-4">
+            <h3 className="text-lg font-semibold text-slate-900">내 리더십</h3>
+            {leadershipOverview ? (
+              <>
+                <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+                  <p className="text-sm text-slate-500">최근 저장 결과</p>
+                  <p className="mt-1 text-4xl font-bold text-slate-900">{leadershipOverview.totalScore}</p>
+                  <p className="mt-1 text-sm font-medium text-blue-600">
+                    {leadershipOverview.resultLabel}
+                  </p>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {leadershipOverview.categoryAverages.map((item) => (
+                    <div key={item.category}>
+                      <div className="mb-1 flex items-center justify-between text-base">
+                        <span className="text-slate-700">{item.category}</span>
+                        <span className="font-semibold text-slate-900">{item.average} / 5</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-slate-200">
+                        <div
+                          className="h-2 rounded-full bg-[#2563EB]"
+                          style={{ width: `${(item.average / 5) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-slate-500">최근 저장된 리더십 진단이 없습니다.</p>
+            )}
+          </div>
         </section>
       </div>
 
       <section className="rounded-xl border bg-white p-5">
         <h2 className="text-lg font-semibold text-slate-900">최근 피드백</h2>
-        <div className="mt-3 grid gap-2 md:grid-cols-4">
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
           <select value={feedType} onChange={(e) => setFeedType(e.target.value as "all" | FeedbackType)} className="rounded-lg border px-3 py-2 text-base">
             <option value="all">전체 유형</option>
             <option value="praise">칭찬</option>
@@ -291,10 +340,6 @@ export default function DashboardPage() {
             <option value="30">최근 30일</option>
             <option value="90">최근 90일</option>
             <option value="all">전체</option>
-          </select>
-          <select value={feedSort} onChange={(e) => setFeedSort(e.target.value as "latest" | "pinned")} className="rounded-lg border px-3 py-2 text-base">
-            <option value="latest">최신순</option>
-            <option value="pinned">핀 우선</option>
           </select>
           <select value={feedEmployeeId} onChange={(e) => setFeedEmployeeId(e.target.value)} className="rounded-lg border px-3 py-2 text-base">
             <option value="all">전체 사람</option>
