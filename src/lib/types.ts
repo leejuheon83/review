@@ -66,3 +66,13 @@ export type Summary = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type LeadershipAssessment = {
+  id: string;
+  ownerUid: string;
+  monthKey: string;
+  scores: Record<string, number>;
+  totalScore: number;
+  memo: string;
+  createdAt: string;
+};

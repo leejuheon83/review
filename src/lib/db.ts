@@ -7,7 +7,15 @@ import {
   seedUsers,
 } from "@/lib/seed";
 import { getFirestoreAdmin, isFirebaseEnabled } from "@/lib/firebase-admin";
-import type { Employee, FeedbackLog, MemberNote, Summary, Team, User } from "@/lib/types";
+import type {
+  Employee,
+  FeedbackLog,
+  LeadershipAssessment,
+  MemberNote,
+  Summary,
+  Team,
+  User,
+} from "@/lib/types";
 
 type DBState = {
   users: User[];
@@ -16,6 +24,7 @@ type DBState = {
   logs: FeedbackLog[];
   notes: MemberNote[];
   summaries: Summary[];
+  leadershipAssessments: LeadershipAssessment[];
 };
 
 const FIRESTORE_COLLECTION = "coaching_log";
@@ -37,6 +46,7 @@ function createSeedState(): DBState {
     logs: clone(seedLogs),
     notes: clone(seedNotes),
     summaries: clone(seedSummaries),
+    leadershipAssessments: [],
   };
 }
 
@@ -60,6 +70,7 @@ function applyState(state: DBState) {
   db.logs = clone(state.logs);
   db.notes = clone(state.notes);
   db.summaries = clone(state.summaries);
+  db.leadershipAssessments = clone(state.leadershipAssessments || []);
 }
 
 export async function ensureDbReady(): Promise<void> {
