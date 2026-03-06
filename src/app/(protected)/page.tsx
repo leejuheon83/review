@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useActor } from "@/components/actor-provider";
 import { apiFetch } from "@/lib/client-api";
+import { validateQuickLogInput } from "@/lib/quick-log-validation";
 import type { Employee, FeedbackLog, FeedbackType } from "@/lib/types";
 
 const suggestionChips = [
@@ -41,9 +42,10 @@ export default function DashboardPage() {
   const [monthlyLogs, setMonthlyLogs] = useState<FeedbackLog[]>([]);
 
   const [employeeId, setEmployeeId] = useState("");
-  const [type, setType] = useState<FeedbackType | "">("");
+  const [type, setType] = useState<FeedbackType | "">("coaching");
   const [memo, setMemo] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeTone, setNoticeTone] = useState<"success" | "error">("success");
 
   const [feedType, setFeedType] = useState<"all" | FeedbackType>("all");
   const [feedPeriod, setFeedPeriod] = useState<"30" | "90" | "all">("30");
@@ -116,17 +118,25 @@ export default function DashboardPage() {
 
   const submitQuickLog = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!employeeId || !type || memo.trim().length < 5 || memo.trim().length > 200) {
-      setNotice("메모는 5~200자로 입력해 주세요.");
+    const error = validateQuickLogInput({ employeeId, type, memo });
+    if (error) {
+      setNoticeTone("error");
+      setNotice(error);
       return;
     }
-    await apiFetch("/api/logs", {
-      method: "POST",
-      body: JSON.stringify({ employeeId, type, memo: memo.trim(), tags: [], pinned: false }),
-    });
-    setMemo("");
-    setNotice("저장 완료. 같은 팀원/다른 팀원으로 바로 이어서 기록할 수 있습니다.");
-    await load();
+    try {
+      await apiFetch("/api/logs", {
+        method: "POST",
+        body: JSON.stringify({ employeeId, type, memo: memo.trim(), tags: [], pinned: false }),
+      });
+      setMemo("");
+      setNoticeTone("success");
+      setNotice("저장 완료. 같은 팀원/다른 팀원으로 바로 이어서 기록할 수 있습니다.");
+      await load();
+    } catch (error) {
+      setNoticeTone("error");
+      setNotice(error instanceof Error ? error.message : "저장 중 문제가 발생했습니다.");
+    }
   };
 
   const deleteLog = async (logId: string) => {
@@ -227,7 +237,11 @@ export default function DashboardPage() {
             </button>
           </form>
           {notice ? (
-            <p className="mt-3 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-emerald-700">
+            <p
+              className={`mt-3 overflow-hidden text-ellipsis whitespace-nowrap text-sm ${
+                noticeTone === "success" ? "text-emerald-700" : "text-rose-700"
+              }`}
+            >
               {notice}
             </p>
           ) : null}
