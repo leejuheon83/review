@@ -8,10 +8,17 @@ import { useActor } from "@/components/actor-provider";
 import { apiFetch } from "@/lib/client-api";
 import type { Team } from "@/lib/types";
 
+const primaryMenus = [
+  { label: "대시보드", href: "/" },
+  { label: "팀원", href: "/members" },
+  { label: "학습 자료", href: "/learning" },
+];
+const leadershipMenu = { label: "내 리더십", href: "/leadership" };
+
 function navClass(active: boolean): string {
   return active
-    ? "block rounded-lg px-4 py-3 text-sm font-medium transition bg-blue-600 text-white"
-    : "block rounded-lg px-4 py-3 text-sm font-medium transition text-gray-700 hover:bg-gray-100";
+    ? "block rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition"
+    : "block rounded-xl border border-transparent px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50";
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -70,19 +77,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <h1 className="text-xl font-bold text-gray-900">팀원 리뷰/코칭 프로그램</h1>
           </div>
           <nav className="space-y-2">
-            <Link href="/" className={navClass(pathname === "/")}>
-              대시보드
-            </Link>
-            <Link href="/members" className={navClass(pathname.startsWith("/members"))}>
-              팀원
-            </Link>
-            <Link href="/leadership" className={navClass(pathname.startsWith("/leadership"))}>
-              리더십 진단
+            <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">Main</p>
+            {primaryMenus.map((menu) => (
+              <Link
+                key={menu.href}
+                href={menu.href}
+                className={navClass(
+                  menu.href === "/"
+                    ? pathname === "/"
+                    : pathname.startsWith(menu.href),
+                )}
+              >
+                {menu.label}
+              </Link>
+            ))}
+            <div className="my-3 border-t border-gray-200" />
+            <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">Leadership</p>
+            <Link
+              href={leadershipMenu.href}
+              className={navClass(pathname.startsWith(leadershipMenu.href))}
+            >
+              {leadershipMenu.label}
             </Link>
             {actor?.role === "HR" ? (
-              <Link href="/hr" className={navClass(pathname.startsWith("/hr"))}>
-                HR 대시보드
-              </Link>
+              <>
+                <div className="my-3 border-t border-gray-200" />
+                <Link href="/hr" className={navClass(pathname.startsWith("/hr"))}>
+                  HR 대시보드
+                </Link>
+              </>
             ) : null}
           </nav>
         </aside>

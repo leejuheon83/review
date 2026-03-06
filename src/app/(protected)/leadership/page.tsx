@@ -41,6 +41,7 @@ export default function LeadershipPage() {
   const resultLabel = useMemo(() => getResultLabel(totalScore), [totalScore]);
   const categoryAverages = useMemo(() => getCategoryAverages(scores), [scores]);
   const { strength, focus } = useMemo(() => getStrengthAndFocus(scores), [scores]);
+  const ownerUid = actor?.id || uid;
 
   const handleScoreChange = (id: LeadershipQuestionId, value: number) => {
     setScores((prev) => ({
@@ -68,13 +69,13 @@ export default function LeadershipPage() {
 
   useEffect(() => {
     const loadRecent = async () => {
-      if (!uid) {
+      if (!ownerUid) {
         setRecent([]);
         return;
       }
 
       try {
-        const items = await getRecentLeadershipAssessments(uid);
+        const items = await getRecentLeadershipAssessments(ownerUid);
         setRecent(items as RecentAssessment[]);
       } catch (error) {
         console.error(error);
@@ -82,10 +83,10 @@ export default function LeadershipPage() {
     };
 
     void loadRecent();
-  }, [uid]);
+  }, [ownerUid]);
 
   const handleSave = async () => {
-    if (!uid) {
+    if (!ownerUid) {
       setMessage("로그인이 필요합니다.");
       return;
     }
@@ -95,14 +96,14 @@ export default function LeadershipPage() {
 
     try {
       await saveLeadershipAssessment({
-        ownerUid: uid,
+        ownerUid,
         monthKey: getMonthKey(),
         scores,
         totalScore,
         memo,
       });
 
-      const items = await getRecentLeadershipAssessments(uid);
+      const items = await getRecentLeadershipAssessments(ownerUid);
       setRecent(items as RecentAssessment[]);
       setMessage("리더십 진단이 저장되었어요.");
     } catch (error) {
