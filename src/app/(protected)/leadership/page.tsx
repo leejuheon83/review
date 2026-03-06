@@ -16,6 +16,7 @@ import {
   type LeadershipQuestionId,
   type LeadershipScores,
 } from "@/lib/leadership-assessment";
+import { buildLeadershipOverview } from "@/lib/leadership-overview";
 import {
   getRecentLeadershipAssessments,
   saveLeadershipAssessment,
@@ -26,6 +27,7 @@ type RecentAssessment = {
   monthKey: string;
   totalScore: number;
   memo: string;
+  scores?: Record<string, number>;
 };
 
 export default function LeadershipPage() {
@@ -42,6 +44,10 @@ export default function LeadershipPage() {
   const categoryAverages = useMemo(() => getCategoryAverages(scores), [scores]);
   const { strength, focus } = useMemo(() => getStrengthAndFocus(scores), [scores]);
   const ownerUid = actor?.id || uid;
+  const latestSavedOverview = useMemo(
+    () => buildLeadershipOverview((recent[0] as { totalScore: number; scores?: Record<string, number> }) || null),
+    [recent],
+  );
 
   const handleScoreChange = (id: LeadershipQuestionId, value: number) => {
     setScores((prev) => ({
@@ -76,7 +82,17 @@ export default function LeadershipPage() {
 
       try {
         const items = await getRecentLeadershipAssessments(ownerUid);
-        setRecent(items as RecentAssessment[]);
+        const parsed = items.map((item) => ({
+          id: String(item.id),
+          monthKey: String(item.monthKey || ""),
+          totalScore: Number(item.totalScore || 0),
+          memo: String(item.memo || ""),
+          scores:
+            item.scores && typeof item.scores === "object"
+              ? (item.scores as Record<string, number>)
+              : undefined,
+        }));
+        setRecent(parsed);
       } catch (error) {
         console.error(error);
       }
@@ -104,7 +120,17 @@ export default function LeadershipPage() {
       });
 
       const items = await getRecentLeadershipAssessments(ownerUid);
-      setRecent(items as RecentAssessment[]);
+      const parsed = items.map((item) => ({
+        id: String(item.id),
+        monthKey: String(item.monthKey || ""),
+        totalScore: Number(item.totalScore || 0),
+        memo: String(item.memo || ""),
+        scores:
+          item.scores && typeof item.scores === "object"
+            ? (item.scores as Record<string, number>)
+            : undefined,
+      }));
+      setRecent(parsed);
       setMessage("리더십 진단이 저장되었어요.");
     } catch (error) {
       console.error(error);
@@ -219,6 +245,42 @@ export default function LeadershipPage() {
           </section>
 
           <aside className="space-y-6">
+            <section id="recent-result" className="rounded-2xl border border-gray-200 bg-white p-6">
+              <h2 className="text-lg font-bold text-gray-900">최근 저장 결과</h2>
+              {latestSavedOverview ? (
+                <>
+                  <div className="mt-4 rounded-2xl bg-gray-50 p-4">
+                    <p className="text-sm text-gray-500">최근 저장 점수</p>
+                    <p className="mt-1 text-3xl font-bold text-gray-900">
+                      {latestSavedOverview.totalScore}
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-blue-600">
+                      {latestSavedOverview.resultLabel}
+                    </p>
+                  </div>
+
+                  <div className="mt-5 space-y-4">
+                    {latestSavedOverview.categoryAverages.map((item) => (
+                      <div key={item.category}>
+                        <div className="mb-1 flex items-center justify-between text-sm">
+                          <span className="text-gray-700">{item.category}</span>
+                          <span className="font-semibold text-gray-900">{item.average} / 5</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gray-100">
+                          <div
+                            className="h-2 rounded-full bg-blue-600 transition-all"
+                            style={{ width: `${(item.average / 5) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-gray-500">최근 저장된 결과가 없습니다.</p>
+              )}
+            </section>
+
             <section className="rounded-2xl border border-gray-200 bg-white p-6">
               <h2 className="text-lg font-bold text-gray-900">진단 요약</h2>
 

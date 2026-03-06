@@ -4,9 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useActor } from "@/components/actor-provider";
 import { apiFetch } from "@/lib/client-api";
-import { buildLeadershipOverview } from "@/lib/leadership-overview";
 import { validateQuickLogInput } from "@/lib/quick-log-validation";
-import type { Employee, FeedbackLog, FeedbackType, LeadershipAssessment } from "@/lib/types";
+import type { Employee, FeedbackLog, FeedbackType } from "@/lib/types";
 
 const suggestionChips = [
   "회의 진행이 매우 좋았습니다.",
@@ -41,7 +40,6 @@ export default function DashboardPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [recentLogs, setRecentLogs] = useState<FeedbackLog[]>([]);
   const [monthlyLogs, setMonthlyLogs] = useState<FeedbackLog[]>([]);
-  const [latestLeadership, setLatestLeadership] = useState<LeadershipAssessment | null>(null);
 
   const [employeeId, setEmployeeId] = useState("");
   const [type, setType] = useState<FeedbackType | "">("coaching");
@@ -59,24 +57,18 @@ export default function DashboardPage() {
 
   const load = async () => {
     const employeeQuery = feedEmployeeId !== "all" ? `&employeeId=${feedEmployeeId}` : "";
-    const [membersRes, recentRes, monthlyRes, leadershipRes] = await Promise.all([
+    const [membersRes, recentRes, monthlyRes] = await Promise.all([
       apiFetch<{ items: Employee[] }>("/api/members"),
       apiFetch<{ items: FeedbackLog[] }>(
         `/api/logs?period=${feedPeriod}&type=${feedType}&sort=latest${employeeQuery}`,
       ),
       apiFetch<{ items: FeedbackLog[] }>("/api/logs?period=30&type=all&sort=latest"),
-      actor?.id
-        ? apiFetch<{ items: LeadershipAssessment[] }>(
-            `/api/leadership-assessments?ownerUid=${encodeURIComponent(actor.id)}`,
-          )
-        : Promise.resolve({ items: [] as LeadershipAssessment[] }),
     ]);
     const activeMembers = membersRes.items.filter((e) => e.active);
     setEmployees(activeMembers);
     setEmployeeId((prev) => prev || activeMembers[0]?.id || "");
     setRecentLogs(recentRes.items.slice(0, 20));
     setMonthlyLogs(monthlyRes.items);
-    setLatestLeadership(leadershipRes.items[0] || null);
   };
 
   useEffect(() => {
@@ -84,15 +76,12 @@ export default function DashboardPage() {
     let cancelled = false;
     const loadInEffect = async () => {
       const employeeQuery = feedEmployeeId !== "all" ? `&employeeId=${feedEmployeeId}` : "";
-      const [membersRes, recentRes, monthlyRes, leadershipRes] = await Promise.all([
+      const [membersRes, recentRes, monthlyRes] = await Promise.all([
         apiFetch<{ items: Employee[] }>("/api/members"),
         apiFetch<{ items: FeedbackLog[] }>(
           `/api/logs?period=${feedPeriod}&type=${feedType}&sort=latest${employeeQuery}`,
         ),
         apiFetch<{ items: FeedbackLog[] }>("/api/logs?period=30&type=all&sort=latest"),
-        apiFetch<{ items: LeadershipAssessment[] }>(
-          `/api/leadership-assessments?ownerUid=${encodeURIComponent(actor.id)}`,
-        ),
       ]);
       if (cancelled) return;
       const activeMembers = membersRes.items.filter((e) => e.active);
@@ -100,18 +89,12 @@ export default function DashboardPage() {
       setEmployeeId((prev) => prev || activeMembers[0]?.id || "");
       setRecentLogs(recentRes.items.slice(0, 20));
       setMonthlyLogs(monthlyRes.items);
-      setLatestLeadership(leadershipRes.items[0] || null);
     };
     void loadInEffect();
     return () => {
       cancelled = true;
     };
   }, [actor, feedEmployeeId, feedPeriod, feedType]);
-
-  const leadershipOverview = useMemo(
-    () => buildLeadershipOverview(latestLeadership),
-    [latestLeadership],
-  );
 
   const coverage = useMemo(() => {
     return employees.map((e) => {
@@ -290,38 +273,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-white p-4">
-            <h3 className="text-lg font-semibold text-slate-900">내 리더십</h3>
-            {leadershipOverview ? (
-              <>
-                <div className="mt-3 rounded-2xl bg-slate-50 p-4">
-                  <p className="text-sm text-slate-500">최근 저장 결과</p>
-                  <p className="mt-1 text-4xl font-bold text-slate-900">{leadershipOverview.totalScore}</p>
-                  <p className="mt-1 text-sm font-medium text-blue-600">
-                    {leadershipOverview.resultLabel}
-                  </p>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {leadershipOverview.categoryAverages.map((item) => (
-                    <div key={item.category}>
-                      <div className="mb-1 flex items-center justify-between text-base">
-                        <span className="text-slate-700">{item.category}</span>
-                        <span className="font-semibold text-slate-900">{item.average} / 5</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-slate-200">
-                        <div
-                          className="h-2 rounded-full bg-[#2563EB]"
-                          style={{ width: `${(item.average / 5) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="mt-3 text-sm text-slate-500">최근 저장된 리더십 진단이 없습니다.</p>
-            )}
-          </div>
         </section>
       </div>
 
