@@ -56,6 +56,25 @@ npm run dev
 - 팀장 계정: `사번 / 사번` (예: `120032 / 120032`)
 - 관리자 계정: `admin / admin`
 
+## 자동 배포 설정 (GitHub Actions)
+
+`master` 브랜치에 푸시하면 아래 순서로 자동 배포됩니다.
+
+1. Firebase Firestore Rules 배포
+2. Vercel Production 배포
+
+워크플로우 파일:
+
+- `.github/workflows/auto-deploy.yml`
+
+GitHub 저장소 `Settings > Secrets and variables > Actions`에 아래 시크릿을 등록해야 동작합니다.
+
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_TOKEN`
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
 ## 주요 화면
 
 - `/` Dashboard
