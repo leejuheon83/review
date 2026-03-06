@@ -70,7 +70,9 @@ function applyState(state: DBState) {
   db.logs = clone(state.logs);
   db.notes = clone(state.notes);
   db.summaries = clone(state.summaries);
-  db.leadershipAssessments = clone(state.leadershipAssessments || []);
+  db.leadershipAssessments = clone(
+    Array.isArray(state.leadershipAssessments) ? state.leadershipAssessments : [],
+  );
 }
 
 export async function ensureDbReady(): Promise<void> {

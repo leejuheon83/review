@@ -17,7 +17,8 @@ export async function GET(req: Request) {
     return forbidden("본인 진단 기록만 조회할 수 있습니다.");
   }
 
-  const items = db.leadershipAssessments
+  const source = Array.isArray(db.leadershipAssessments) ? db.leadershipAssessments : [];
+  const items = source
     .filter((item) => item.ownerUid === ownerUid)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 6);
@@ -58,6 +59,9 @@ export async function POST(req: Request) {
     createdAt: new Date().toISOString(),
   };
 
+  if (!Array.isArray(db.leadershipAssessments)) {
+    db.leadershipAssessments = [];
+  }
   db.leadershipAssessments.unshift(item);
   await persistDbState();
 
