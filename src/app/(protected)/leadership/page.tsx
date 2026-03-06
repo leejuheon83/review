@@ -108,7 +108,8 @@ export default function LeadershipPage() {
       setMessage("리더십 진단이 저장되었어요.");
     } catch (error) {
       console.error(error);
-      setMessage("저장 중 문제가 발생했어요.");
+      const reason = error instanceof Error ? error.message : "알 수 없는 오류";
+      setMessage(`저장 중 문제가 발생했어요. (${reason})`);
     } finally {
       setLoading(false);
     }
