@@ -7,7 +7,7 @@ type TheoryCardProps = {
 
 export default function TheoryCard({ content }: TheoryCardProps) {
   return (
-    <article className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+    <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
       <div className="mb-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
           {content.category === "feedback" ? "피드백 스킬" : "1:1 미팅 가이드"}

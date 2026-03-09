@@ -15,6 +15,9 @@ describe("buildLearningRecommendation", () => {
 
     assert.equal(result.focusArea, "feedback");
     assert.equal(result.recommendedContentIds.includes("sbi-feedback"), true);
+    assert.equal(result.actionGuideTitle.length > 0, true);
+    assert.equal(result.actionGuideSummary.length > 0, true);
+    assert.equal(result.actionItems.length > 0, true);
   });
 
   it("returns oneonone focus when one on one logs are not enough", () => {
@@ -28,6 +31,7 @@ describe("buildLearningRecommendation", () => {
 
     assert.equal(result.focusArea, "oneonone");
     assert.deepEqual(result.recommendedContentIds, ["oneonone-flow", "oneonone-questions"]);
+    assert.equal(result.actionItems.length, 3);
   });
 });
 

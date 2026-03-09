@@ -7,12 +7,6 @@ import { apiFetch } from "@/lib/client-api";
 import { validateQuickLogInput } from "@/lib/quick-log-validation";
 import type { Employee, FeedbackLog, FeedbackType } from "@/lib/types";
 
-const suggestionChips = [
-  "회의 진행이 매우 좋았습니다.",
-  "고객 커뮤니케이션이 명확했습니다.",
-  "리포트 구조가 매우 명확했습니다.",
-  "업무 우선순위 개선이 필요합니다.",
-];
 const monthlyTargetPerMember = 4;
 
 function typeMeta(type: FeedbackType): { label: string; icon: string } {
@@ -46,6 +40,8 @@ export default function DashboardPage() {
   const [memo, setMemo] = useState("");
   const [notice, setNotice] = useState("");
   const [noticeTone, setNoticeTone] = useState<"success" | "error">("success");
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const [feedType, setFeedType] = useState<"all" | FeedbackType>("all");
   const [feedPeriod, setFeedPeriod] = useState<"30" | "90" | "all">("30");
@@ -70,6 +66,10 @@ export default function DashboardPage() {
     setRecentLogs(recentRes.items.slice(0, 20));
     setMonthlyLogs(monthlyRes.items);
   };
+
+  useEffect(() => {
+    setAiSuggestions([]);
+  }, [employeeId, type]);
 
   useEffect(() => {
     if (!actor || actor.role !== "MANAGER") return;
@@ -144,6 +144,35 @@ export default function DashboardPage() {
     await load();
   };
 
+  const fetchAiSuggestions = async () => {
+    if (!employeeId || !type) {
+      setNoticeTone("error");
+      setNotice("팀원과 피드백 유형을 먼저 선택해 주세요.");
+      return;
+    }
+    setAiLoading(true);
+    setAiSuggestions([]);
+    setNotice("");
+    try {
+      const res = await apiFetch<{ suggestions: string[] }>("/api/suggestions/phrases", {
+        method: "POST",
+        body: JSON.stringify({
+          employeeId,
+          feedbackType: type,
+          context: memo.trim().slice(0, 120) || undefined,
+        }),
+      });
+      setAiSuggestions(res.suggestions);
+      setNoticeTone("success");
+      setNotice("AI 추천 문구를 생성했습니다. 아래에서 선택해 보세요.");
+    } catch (error) {
+      setNoticeTone("error");
+      setNotice(error instanceof Error ? error.message : "AI 글쓰기 지원을 불러오는데 실패했습니다.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const saveEdit = async () => {
     if (!editing) return;
     await apiFetch(`/api/logs/${editing.id}`, {
@@ -179,13 +208,13 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[420px_1fr]">
-        <section className="rounded-xl border bg-white p-5">
+        <section className="rounded-xl border bg-white p-4 sm:p-5">
           <h2 className="text-lg font-semibold text-slate-900">빠른 기록</h2>
           <form onSubmit={submitQuickLog} className="mt-3 space-y-3">
             <select
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-base"
+              className="w-full rounded-lg border px-3 py-2.5 text-base touch-target"
             >
               <option value="">팀원 선택</option>
               {employees.map((e) => (
@@ -195,7 +224,7 @@ export default function DashboardPage() {
               ))}
             </select>
 
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {(["praise", "growth", "improve", "coaching", "other"] as FeedbackType[]).map((t) => (
                 <button
                   key={t}
@@ -218,20 +247,41 @@ export default function DashboardPage() {
               placeholder="구체적 사례를 한 줄로 남겨보세요. (5~200자)"
             />
 
-            <div className="grid grid-cols-2 gap-2">
-              {suggestionChips.map((chip) => (
-                <button
-                  key={chip}
-                  type="button"
-                  onClick={() => setMemo(chip)}
-                  className="truncate whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-[13px] text-slate-700 hover:bg-slate-200"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => void fetchAiSuggestions()}
+              disabled={aiLoading || !employeeId || !type}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50 touch-target"
+            >
+              {aiLoading ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  AI 문구 생성 중...
+                </>
+              ) : (
+                "AI 글쓰기 지원"
+              )}
+            </button>
 
-            <button className="w-full rounded-lg bg-[#0070C9] px-4 py-2 text-base font-semibold text-white">
+            {aiSuggestions.length > 0 ? (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-rose-700">AI 추천 문구 (클릭하여 적용)</p>
+                <div className="grid gap-2 grid-cols-1">
+                  {aiSuggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setMemo(s)}
+                      className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-left text-sm text-slate-800 hover:bg-rose-100"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <button className="w-full rounded-lg bg-[#0070C9] px-4 py-3 text-base font-semibold text-white touch-target">
               기록 저장
             </button>
           </form>
@@ -251,7 +301,7 @@ export default function DashboardPage() {
             <h3 className="text-lg font-semibold text-slate-900">팀 코칭 커버리지</h3>
             <div className="mt-3 space-y-2">
               {coverage.map((c) => (
-                <div key={c.id} className="grid grid-cols-[110px_1fr_50px] items-center gap-2 text-base">
+                <div key={c.id} className="grid grid-cols-[minmax(80px,110px)_1fr_40px] items-center gap-2 text-sm sm:text-base">
                   <span className="truncate text-slate-700">{c.name}</span>
                   <div className="h-2 overflow-hidden rounded bg-slate-200">
                     <div className="h-full bg-[#0070C9]" style={{ width: `${Math.round(c.ratio * 100)}%` }} />
@@ -265,7 +315,7 @@ export default function DashboardPage() {
           <div className="rounded-xl border bg-white p-4">
             <h3 className="text-lg font-semibold text-slate-900">팀장 활동 요약</h3>
             <p className="mt-1 text-sm text-slate-500">이번 달</p>
-            <div className="mt-3 grid grid-cols-2 gap-3 text-base">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 text-sm sm:text-base">
               <p className="rounded bg-slate-50 p-2 text-slate-700">전체 기록: {summary.total}</p>
               <p className="rounded bg-slate-50 p-2 text-slate-700">👍 칭찬: {summary.praise}</p>
               <p className="rounded bg-slate-50 p-2 text-slate-700">💬 코칭: {summary.coaching}</p>
@@ -278,7 +328,7 @@ export default function DashboardPage() {
 
       <section className="rounded-xl border bg-white p-5">
         <h2 className="text-lg font-semibold text-slate-900">최근 피드백</h2>
-        <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <div className="mt-3 grid gap-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
           <select value={feedType} onChange={(e) => setFeedType(e.target.value as "all" | FeedbackType)} className="rounded-lg border px-3 py-2 text-base">
             <option value="all">전체 유형</option>
             <option value="praise">칭찬</option>

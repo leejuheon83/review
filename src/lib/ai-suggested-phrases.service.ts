@@ -45,7 +45,8 @@ function enforceSentenceLength(text: string): string {
 function topTags(logs: FeedbackLog[]): string {
   const map = new Map<string, number>();
   for (const log of logs) {
-    for (const tag of log.tags) {
+    const tags = Array.isArray(log.tags) ? log.tags : [];
+    for (const tag of tags) {
       map.set(tag, (map.get(tag) || 0) + 1);
     }
   }
@@ -126,18 +127,23 @@ export async function generateSuggestedPhrases(
     throw new SuggestedPhraseValidationError("상황 설명은 120자 이내로 입력해 주세요.");
   }
 
-  const employee = store.employees.find((e) => e.id === input.employeeId);
+  const employees = Array.isArray(store.employees) ? store.employees : [];
+  const employee = employees.find((e) => e && e.id === input.employeeId);
   if (!employee) {
     throw new SuggestedPhraseValidationError("팀원을 찾을 수 없습니다.");
   }
 
-  if (input.actor.role === "MANAGER" && employee.managerId !== input.actor.id) {
+  const isManagerOfEmployee =
+    employee.managerId === input.actor.id ||
+    (input.actor.teamId && employee.teamId === input.actor.teamId);
+  if (input.actor.role === "MANAGER" && !isManagerOfEmployee) {
     throw new SuggestedPhrasePermissionError("본인 팀원에 대해서만 추천 문구를 생성할 수 있습니다.");
   }
 
+  const logsArray = Array.isArray(store.logs) ? store.logs : [];
   const now = Date.now();
-  const logs = store.logs
-    .filter((l) => l.employeeId === employee.id)
+  const logs = logsArray
+    .filter((l) => l && l.employeeId === employee.id)
     .filter((l) => now - new Date(l.createdAt).getTime() <= 90 * 24 * 60 * 60 * 1000)
     .slice()
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())

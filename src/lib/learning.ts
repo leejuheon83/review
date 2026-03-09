@@ -125,3 +125,15 @@ export const learningContents: LearningContent[] = [
 export function getLearningContentsByCategory(category: LearningCategory): LearningContent[] {
   return learningContents.filter((item) => item.category === category);
 }
+
+export function getLearningContentLabel(id: string) {
+  const labelMap: Record<string, string> = {
+    "radical-candor": "Radical Candor",
+    "sbi-feedback": "SBI 피드백",
+    "positive-feedback": "좋은 칭찬 피드백",
+    "oneonone-flow": "1:1 미팅 구조",
+    "oneonone-questions": "1:1 질문 가이드",
+  };
+
+  return labelMap[id] ?? id;
+}

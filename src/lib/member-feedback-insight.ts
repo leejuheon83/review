@@ -16,6 +16,13 @@ type Insight = {
   nextActionPlan: string;
 };
 
+type LeadershipSignal = {
+  totalScore: number;
+  resultLabel: string;
+  strengthCategory: string;
+  focusCategory: string;
+};
+
 function countTypes(logs: FeedbackLog[]): TypeCounts {
   return {
     praise: logs.filter((l) => l.type === "praise").length,
@@ -69,23 +76,71 @@ function recommendedByType(type: keyof TypeCounts, latestMemo: string): string {
   return `최근 피드백에서는 "${signal}"를 포함한 업무 실행 맥락이 확인됩니다. 현재 단계에서는 평가적 표현보다 관찰 가능한 행동과 결과를 연결해 코칭하는 접근이 효과적이며, 팀 업무 흐름 안에서 바로 적용 가능한 액션을 우선 선정하는 것이 좋습니다. 다음 피드백에서는 무엇을 언제까지 어떤 기준으로 수행할지 명확히 합의하고, 짧은 회고를 통해 개선 포인트를 누적해 주세요.`;
 }
 
-function nextActionByType(type: keyof TypeCounts): string {
-  if (type === "praise") {
-    return "액션 플랜: 이번 주에는 강점으로 확인된 행동을 재현 가능한 실행 항목으로 구체화하세요. 먼저 업무 시작 전에 적용할 체크포인트 2가지를 정하고, 진행 중에는 실제로 적용됐는지 짧게 기록합니다. 주간 1:1에서는 어떤 상황에서 효과가 컸는지와 추가 보완이 필요한 지점을 함께 리뷰해, 다음 주에도 같은 품질로 반복할 수 있도록 팀 기준으로 정리하세요.";
-  }
-  if (type === "growth") {
-    return "액션 플랜: 성장 확장을 위해 2주 단위 목표 1개를 설정하고, 목표 달성 기준을 수치 또는 산출물 형태로 명확히 합의하세요. 실행 첫 주에는 시도 내용과 어려움을 짧게 기록하고, 둘째 주에는 결과와 개선점을 정리해 공유하도록 합니다. 1:1에서는 잘된 점과 다음 확장 포인트를 분리해서 피드백해, 강점이 실제 성과로 연결되는 루틴을 만들도록 지원하세요.";
-  }
-  if (type === "improve") {
-    return "액션 플랜: 개선 이슈를 추상적으로 다루지 말고 이번 주 실행 항목 1개로 전환하세요. 시작 전에 완료 기준과 확인 시점을 먼저 정하고, 중간 점검에서는 진행률과 장애요인을 짧게 확인합니다. 주간 말에는 실제 변화가 있었는지 결과를 리뷰하고, 필요하면 다음 주 액션을 한 단계 더 구체화해 재시도하도록 설계하세요.";
-  }
-  if (type === "coaching") {
-    return "액션 플랜: 코칭 내용을 실행으로 연결하기 위해 착수 전 정렬 루틴을 적용하세요. 업무 시작 전에 우선순위, 예상 리스크, 완료 기준을 먼저 작성하게 하고, 진행 중에는 핵심 변경사항을 한 줄로 공유하도록 합니다. 다음 1:1에서는 계획 대비 실행 차이와 원인을 함께 점검하고, 다음 사이클에서 바로 적용할 보완 행동 1가지를 확정해 실행력을 높이세요.";
-  }
-  return "액션 플랜: 이번 주 핵심 업무 1건을 기준으로 목표-진행-리스크를 짧게 기록하는 루틴을 도입하세요. 주중에는 진행 상태를 한 번 점검하고 필요 시 우선순위를 조정합니다. 주간 리뷰에서는 무엇이 효과적이었고 무엇이 지연 요인이었는지 함께 정리해, 다음 주 실행 계획을 더 명확한 기준으로 업데이트하세요.";
+function extractRecentSignals(logs: FeedbackLog[], type: keyof TypeCounts, max = 2): string[] {
+  return logs
+    .filter((l) => l.type === type && l.memo?.trim())
+    .slice(0, 3)
+    .map((l) => clip(l.memo, 28))
+    .filter(Boolean)
+    .slice(0, max);
 }
 
-export function buildMemberFeedbackInsight(logs: FeedbackLog[]): Insight {
+/**
+ * 기록 내용을 반영해 개인화된 액션 플랜을 생성합니다.
+ * 향후 OPENAI_API_KEY 등 LLM API 연동 시, 이 함수를 API 호출로 대체하면
+ * 더 풍부하고 맥락에 맞는 액션 플랜을 생성할 수 있습니다.
+ */
+function buildNextActionPlan(logs: FeedbackLog[], dominant: keyof TypeCounts): string {
+  const recentByType = extractRecentSignals(logs, dominant);
+  const signal = recentByType[0] || "";
+  const secondSignal = recentByType[1] || "";
+
+  if (dominant === "praise" && signal) {
+    return `액션 플랜: "${signal}"처럼 확인된 강점을 이번 주에도 유지·확장하세요. 업무 시작 전 적용할 체크포인트 1~2가지를 정하고, 주중 1회 이상 해당 행동이 발휘된 상황을 짧게 기록합니다. 다음 1:1에서 어떤 맥락에서 효과적이었는지 함께 정리해 재현 기준을 만들도록 하세요.`;
+  }
+  if (dominant === "praise") {
+    return "액션 플랜: 강점으로 확인된 행동을 재현 가능한 실행 항목으로 구체화하세요. 업무 시작 전 체크포인트 2가지를 정하고, 주간 1:1에서 효과적이었던 상황과 보완 지점을 함께 리뷰하세요.";
+  }
+
+  if (dominant === "growth" && signal) {
+    return `액션 플랜: "${signal}"를 바탕으로 2주 단위 성장 목표 1개를 설정하세요. 달성 기준을 수치·산출물로 명확히 하고, 첫 주에는 시도·어려움, 둘째 주에는 결과·개선점을 짧게 기록합니다. 1:1에서 강점 확장 포인트를 분리해 피드백하세요.`;
+  }
+  if (dominant === "growth") {
+    return "액션 플랜: 성장 확장을 위해 2주 단위 목표 1개를 설정하고, 달성 기준을 명확히 합의하세요. 실행 주차별로 시도·결과를 기록하고, 1:1에서 강점이 성과로 연결되는 루틴을 만드세요.";
+  }
+
+  if (dominant === "improve" && signal) {
+    return `액션 플랜: "${signal}" 관련 개선을 이번 주 실행 항목 1개로 전환하세요. 완료 기준과 확인 시점을 먼저 정하고, 주중 점검에서 진행률·장애요인을 확인합니다. 주말에 결과를 리뷰하고 필요 시 다음 주 액션을 구체화하세요.`;
+  }
+  if (dominant === "improve") {
+    return "액션 플랜: 개선 이슈를 이번 주 실행 항목 1개로 전환하세요. 완료 기준과 확인 시점을 정하고, 주중 점검·주말 리뷰로 개선 루프를 안정화하세요.";
+  }
+
+  if (dominant === "coaching" && signal) {
+    return `액션 플랜: "${signal}"를 실행으로 연결하기 위해 착수 전 정렬 루틴을 적용하세요. 업무 시작 전 우선순위·리스크·완료 기준을 먼저 작성하고, 진행 중 핵심 변경사항을 한 줄로 공유합니다. 다음 1:1에서 계획 대비 실행 차이를 점검하고 보완 행동 1가지를 확정하세요.`;
+  }
+  if (dominant === "coaching") {
+    return "액션 플랜: 코칭 내용을 실행으로 연결하기 위해 착수 전에 우선순위·리스크·완료 기준을 먼저 합의하세요. 진행 중 변경사항을 짧게 공유하고, 1:1에서 계획 대비 실행 차이를 점검하세요.";
+  }
+
+  if (signal && secondSignal) {
+    return `액션 플랜: 최근 "${signal}", "${secondSignal}" 맥락을 반영해 이번 주 핵심 실행 1건을 정하세요. 목표-진행-리스크를 짧게 기록하고, 주중 1회 점검 후 주말에 결과를 리뷰해 다음 주 계획을 업데이트하세요.`;
+  }
+  if (signal) {
+    return `액션 플랜: "${signal}"를 기준으로 이번 주 실행 1건을 정하세요. 목표·진행·리스크를 짧게 기록하고, 주말 리뷰에서 효과·지연 요인을 정리해 다음 주 계획을 명확히 하세요.`;
+  }
+  return "액션 플랜: 이번 주 핵심 업무 1건을 기준으로 목표-진행-리스크를 짧게 기록하세요. 주중 점검과 주말 리뷰로 실행 계획을 업데이트하세요.";
+}
+
+function buildLeadershipPrefix(signal?: LeadershipSignal | null): string {
+  if (!signal) return "";
+  return `리더십 자가진단 기준 현재 상태는 ${signal.resultLabel}(${signal.totalScore}점)이며, 강점은 ${signal.strengthCategory}, 우선 보완 영역은 ${signal.focusCategory}입니다. `;
+}
+
+export function buildMemberFeedbackInsight(
+  logs: FeedbackLog[],
+  leadershipSignal?: LeadershipSignal | null,
+): Insight {
   if (logs.length === 0) {
     return {
       total: 0,
@@ -113,11 +168,16 @@ export function buildMemberFeedbackInsight(logs: FeedbackLog[]): Insight {
     total: sorted.length,
     typeCounts: counts,
     briefSummary: `총 ${sorted.length}건 · 칭찬 ${counts.praise} · 성장 ${counts.growth} · 개선 ${counts.improve} · 코칭 ${counts.coaching}`,
-    recommendedMent: fitLength(recommendedByType(dominant, latest.memo), 320, 400, [
-      "특히 최근 로그의 문맥을 보면 실행 시점과 공유 방식의 정렬이 성과 차이를 만들고 있어, 코칭 대화에서도 행동 단위를 구체화하는 것이 중요합니다.",
-      "다음 피드백에서는 잘된 행동을 재사용 가능한 방식으로 남기고, 보완이 필요한 지점은 단일 액션으로 축소해 실행 가능성을 높여주세요.",
-    ]),
-    nextActionPlan: fitLength(nextActionByType(dominant), 220, 300, [
+    recommendedMent: fitLength(
+      `${buildLeadershipPrefix(leadershipSignal)}${recommendedByType(dominant, latest.memo)}`,
+      320,
+      400,
+      [
+        "특히 최근 로그의 문맥을 보면 실행 시점과 공유 방식의 정렬이 성과 차이를 만들고 있어, 코칭 대화에서도 행동 단위를 구체화하는 것이 중요합니다.",
+        "다음 피드백에서는 잘된 행동을 재사용 가능한 방식으로 남기고, 보완이 필요한 지점은 단일 액션으로 축소해 실행 가능성을 높여주세요.",
+      ],
+    ),
+    nextActionPlan: fitLength(buildNextActionPlan(sorted, dominant), 220, 300, [
       "점검 시에는 결과뿐 아니라 실행 과정에서 막힌 요인도 함께 확인해 다음 사이클 계획에 반영하세요.",
       "가능하면 담당자와 점검 일정을 캘린더에 미리 고정해 실천률을 높여주세요.",
     ]),

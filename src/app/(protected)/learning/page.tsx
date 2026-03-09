@@ -124,9 +124,9 @@ export default function LearningPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#f6f7fb] px-6 py-8">
+    <main className="min-h-screen bg-[#f6f7fb] px-4 py-6 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-6 rounded-2xl border border-gray-200 bg-white px-6 py-5">
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white px-4 py-4 sm:px-6 sm:py-5">
           <p className="text-sm font-semibold text-blue-600">Learning Library</p>
           <h1 className="mt-2 text-2xl font-bold text-gray-900">학습 자료</h1>
           <p className="mt-2 text-sm text-gray-600">
@@ -147,7 +147,7 @@ export default function LearningPage() {
           <div className="space-y-8">
             <AIRecommendationCard recommendation={recommendation} />
 
-            <section className="rounded-2xl border border-gray-200 bg-white p-6">
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
               <h2 className="text-lg font-bold text-gray-900">추천 콘텐츠</h2>
               <p className="mt-1 text-sm text-gray-500">현재 상태를 기준으로 먼저 보면 좋은 콘텐츠예요.</p>
 

@@ -58,7 +58,7 @@ npm run dev
 
 ## 자동 배포 설정 (GitHub Actions)
 
-`master` 브랜치에 푸시하면 아래 순서로 자동 배포됩니다.
+GitHub Actions에서 필요할 때 수동 실행하면 아래 순서로 배포됩니다.
 
 1. Firebase Firestore Rules 배포
 2. Vercel Production 배포

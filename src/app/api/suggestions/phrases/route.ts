@@ -19,7 +19,12 @@ export async function POST(req: Request) {
   await ensureDbReady();
   const actor = getActorFromRequest(req);
   if (!actor) return unauthorized();
-  const body = (await req.json()) as RequestBody;
+  let body: RequestBody;
+  try {
+    body = (await req.json()) as RequestBody;
+  } catch {
+    return NextResponse.json({ error: "요청 형식이 올바르지 않습니다." }, { status: 400 });
+  }
   try {
     const result = await generateSuggestedPhrases({
       actor,
@@ -36,6 +41,8 @@ export async function POST(req: Request) {
     if (error instanceof SuggestedPhraseValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ error: "추천 문구 생성에 실패했습니다." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "추천 문구 생성에 실패했습니다.";
+    console.error("[suggestions/phrases]", error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

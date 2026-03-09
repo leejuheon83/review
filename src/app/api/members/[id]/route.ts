@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, ensureDbReady, persistDbState } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
+import { buildMemberProfilePatch } from "@/lib/member-profile";
 
 export async function GET(
   req: Request,
@@ -35,10 +36,41 @@ export async function PATCH(
     return forbidden("본인 팀원만 수정할 수 있습니다.");
   }
 
-  const body = (await req.json()) as { active?: boolean };
+  const body = (await req.json()) as { active?: boolean; name?: string; role?: string };
+  let changed = false;
+
   if (typeof body.active === "boolean") {
     employee.active = body.active;
+    changed = true;
+  }
+
+  const hasProfileField =
+    Object.prototype.hasOwnProperty.call(body, "name") ||
+    Object.prototype.hasOwnProperty.call(body, "role");
+
+  if (hasProfileField) {
+    const patch = buildMemberProfilePatch({
+      name: body.name,
+      role: body.role,
+    });
+
+    if (patch.error) {
+      return NextResponse.json({ error: patch.error }, { status: 400 });
+    }
+
+    if (patch.updates.name) {
+      employee.name = patch.updates.name;
+      changed = true;
+    }
+    if (patch.updates.role) {
+      employee.role = patch.updates.role;
+      changed = true;
+    }
+  }
+
+  if (changed) {
     await persistDbState();
   }
+
   return NextResponse.json({ item: employee });
 }

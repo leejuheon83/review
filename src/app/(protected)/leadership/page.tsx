@@ -56,6 +56,35 @@ export default function LeadershipPage() {
     }));
   };
 
+  const mergeScores = (itemScores?: Record<string, number>): LeadershipScores => {
+    if (!itemScores || typeof itemScores !== "object") return defaultLeadershipScores;
+    const merged = { ...defaultLeadershipScores };
+    (["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9", "q10"] as const).forEach((key) => {
+      const v = itemScores[key];
+      if (typeof v === "number" && v >= 1 && v <= 5) merged[key] = v;
+    });
+    return merged;
+  };
+
+  const handleLoadPrevious = (item: RecentAssessment) => {
+    setScores(mergeScores(item.scores));
+    setMemo(item.memo || "");
+  };
+
+  const handleNewDiagnosis = () => {
+    if (recent.length > 0) {
+      handleLoadPrevious(recent[0]);
+    } else {
+      setScores(defaultLeadershipScores);
+      setMemo("");
+    }
+  };
+
+  const handleReset = () => {
+    setScores(defaultLeadershipScores);
+    setMemo("");
+  };
+
   useEffect(() => {
     if (!auth) {
       setUid(actor?.id ?? null);
@@ -142,9 +171,9 @@ export default function LeadershipPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f6f7fb] px-6 py-8">
+    <main className="min-h-screen bg-[#f6f7fb] px-4 py-6 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-6 rounded-2xl border border-gray-200 bg-white px-6 py-5">
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white px-4 py-4 sm:px-6 sm:py-5">
           <p className="text-sm font-semibold text-blue-600">Leadership Check</p>
           <h1 className="mt-2 text-2xl font-bold text-gray-900">리더십 자기 진단</h1>
           <p className="mt-2 text-sm text-gray-600">
@@ -245,7 +274,7 @@ export default function LeadershipPage() {
           </section>
 
           <aside className="space-y-6">
-            <section id="recent-result" className="rounded-2xl border border-gray-200 bg-white p-6">
+            <section id="recent-result" className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
               <h2 className="text-lg font-bold text-gray-900">최근 저장 결과</h2>
               {latestSavedOverview ? (
                 <>
@@ -268,7 +297,9 @@ export default function LeadershipPage() {
                         </div>
                         <div className="h-2 rounded-full bg-gray-100">
                           <div
-                            className="h-2 rounded-full bg-blue-600 transition-all"
+                          className={`h-2 rounded-full transition-all ${
+                            item.average <= 2.5 ? "bg-rose-500" : "bg-blue-600"
+                          }`}
                             style={{ width: `${(item.average / 5) * 100}%` }}
                           />
                         </div>
@@ -281,7 +312,7 @@ export default function LeadershipPage() {
               )}
             </section>
 
-            <section className="rounded-2xl border border-gray-200 bg-white p-6">
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
               <h2 className="text-lg font-bold text-gray-900">진단 요약</h2>
 
               <div className="mt-4 rounded-2xl bg-gray-50 p-4">
@@ -299,7 +330,9 @@ export default function LeadershipPage() {
                     </div>
                     <div className="h-2 rounded-full bg-gray-100">
                       <div
-                        className="h-2 rounded-full bg-blue-600 transition-all"
+                        className={`h-2 rounded-full transition-all ${
+                          item.average <= 2.5 ? "bg-rose-500" : "bg-blue-600"
+                        }`}
                         style={{ width: `${(item.average / 5) * 100}%` }}
                       />
                     </div>
@@ -308,7 +341,7 @@ export default function LeadershipPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-gray-200 bg-white p-6">
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
               <h2 className="text-lg font-bold text-gray-900">강점 / 집중 영역</h2>
 
               <div className="mt-4 space-y-3">
@@ -326,7 +359,7 @@ export default function LeadershipPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-gray-200 bg-white p-6">
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
               <h2 className="text-lg font-bold text-gray-900">점수 기준</h2>
 
               <div className="mt-4 space-y-2 text-sm text-gray-600">
@@ -348,15 +381,37 @@ export default function LeadershipPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-gray-200 bg-white p-6">
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
               <h2 className="text-lg font-bold text-gray-900">최근 저장 기록</h2>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleNewDiagnosis}
+                  className="rounded-lg border border-blue-600 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-100"
+                >
+                  새로 진단 (이전 참고)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                  처음부터
+                </button>
+              </div>
 
               <div className="mt-4 space-y-3">
                 {recent.length === 0 ? (
                   <p className="text-sm text-gray-500">아직 저장된 리더십 진단이 없어요.</p>
                 ) : (
                   recent.map((item) => (
-                    <div key={item.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleLoadPrevious(item)}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 p-4 text-left transition hover:border-blue-300 hover:bg-blue-50/50"
+                    >
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-semibold text-gray-900">{item.monthKey}</p>
                         <span className="text-sm font-bold text-blue-600">{item.totalScore}점</span>
@@ -366,7 +421,8 @@ export default function LeadershipPage() {
                       ) : (
                         <p className="mt-2 text-sm text-gray-400">메모 없음</p>
                       )}
-                    </div>
+                      <p className="mt-1 text-xs text-gray-500">클릭하면 진단표에 불러옵니다</p>
+                    </button>
                   ))
                 )}
               </div>

@@ -52,6 +52,25 @@ test("추천 멘트는 최근 메모를 반영한다", () => {
   assert.match(insight.recommendedMent, /우선순위 기준/);
 });
 
+test("추천 멘트는 리더십 진단 결과를 함께 반영한다", () => {
+  const logs: FeedbackLog[] = [
+    makeLog({
+      type: "coaching",
+      memo: "주간 업무 시작 전에 우선순위를 먼저 정리해보세요.",
+      createdAt: "2026-03-05T00:00:00.000Z",
+    }),
+  ];
+  const insight = buildMemberFeedbackInsight(logs, {
+    totalScore: 36,
+    resultLabel: "안정적 리더십",
+    strengthCategory: "신뢰/동기부여",
+    focusCategory: "코칭/성장",
+  });
+
+  assert.match(insight.recommendedMent, /안정적 리더십/);
+  assert.match(insight.recommendedMent, /코칭\/성장/);
+});
+
 test("추천 멘트는 400자 이내다", () => {
   const logs: FeedbackLog[] = [
     makeLog({

@@ -94,8 +94,8 @@ function LoginContent() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-6">
-      <div className="font-sbs-trust-regular w-full max-w-[560px] rounded-[22px] border border-slate-200 bg-white px-12 py-10 shadow-[0_16px_40px_rgba(15,23,42,0.08)]">
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-6 pb-safe">
+      <div className="font-sbs-trust-regular w-full max-w-[560px] rounded-[22px] border border-slate-200 bg-white px-5 py-8 shadow-[0_16px_40px_rgba(15,23,42,0.08)] sm:px-12 sm:py-10">
         <div className="flex justify-center">
           <Image src="/sbs-mnc-ci.png" alt="SBS M&C" width={190} height={62} className="h-auto w-[190px]" />
         </div>
@@ -120,7 +120,7 @@ function LoginContent() {
               value={employeeNo}
               onChange={(e) => setEmployeeNo(e.target.value.slice(0, 20))}
               placeholder="사번을 입력하세요 (예: 120032)"
-              className="mx-auto block h-[72px] w-[96%] rounded-2xl border border-[#C9D5E6] px-6 text-[25px] tracking-[-0.02em] text-[#1E3A5F] placeholder:text-[20px] placeholder:text-[#A2B1C7] focus:border-[#0070C9] focus:outline-none"
+              className="mx-auto block h-14 w-full max-w-[96%] rounded-2xl border border-[#C9D5E6] px-4 text-lg tracking-[-0.02em] text-[#1E3A5F] placeholder:text-base placeholder:text-[#A2B1C7] focus:border-[#0070C9] focus:outline-none sm:h-[72px] sm:px-6 sm:text-[25px] sm:placeholder:text-[20px]"
               autoComplete="username"
               required
             />
@@ -136,7 +136,7 @@ function LoginContent() {
               onChange={(e) => setPassword(e.target.value.slice(0, 20))}
               type="password"
               placeholder="비밀번호를 입력하세요"
-              className="mx-auto block h-[72px] w-[96%] rounded-2xl border border-[#C9D5E6] px-6 text-[25px] tracking-[-0.02em] text-[#1E3A5F] placeholder:text-[20px] placeholder:text-[#A2B1C7] focus:border-[#0070C9] focus:outline-none"
+              className="mx-auto block h-14 w-full max-w-[96%] rounded-2xl border border-[#C9D5E6] px-4 text-lg tracking-[-0.02em] text-[#1E3A5F] placeholder:text-base placeholder:text-[#A2B1C7] focus:border-[#0070C9] focus:outline-none sm:h-[72px] sm:px-6 sm:text-[25px] sm:placeholder:text-[20px]"
               autoComplete="current-password"
               required
             />
@@ -170,7 +170,7 @@ function LoginContent() {
           <button
             type="submit"
             disabled={loading || actors.length === 0}
-            className="mx-auto mt-2 block h-[72px] w-[96%] rounded-2xl bg-[#0059A8] text-[22px] font-semibold tracking-[-0.02em] text-white transition hover:bg-[#004A8C] disabled:cursor-not-allowed disabled:opacity-50"
+            className="mx-auto mt-2 block h-14 w-full max-w-[96%] rounded-2xl bg-[#0059A8] text-lg font-semibold tracking-[-0.02em] text-white transition hover:bg-[#004A8C] disabled:cursor-not-allowed disabled:opacity-50 touch-target sm:h-[72px] sm:text-[22px]"
           >
             로그인
           </button>

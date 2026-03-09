@@ -184,7 +184,7 @@ export default function MemberDetailPage() {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
-        <aside className="rounded-xl border bg-white p-4">
+        <aside className="order-2 rounded-xl border bg-white p-4 lg:order-1">
           <h2 className="text-base font-semibold text-slate-900">팀원 요약</h2>
           <p className="mt-1 text-xs text-slate-500">최근 30일</p>
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-700">
@@ -200,10 +200,10 @@ export default function MemberDetailPage() {
           </div>
         </aside>
 
-        <section className="space-y-4">
+        <section className="order-1 space-y-4 lg:order-2">
           <div className="rounded-xl border bg-white p-4">
             <h3 className="text-base font-semibold text-slate-900">AI 요약</h3>
-            <div className="mt-3 grid gap-2 md:grid-cols-4">
+            <div className="mt-3 grid gap-2 grid-cols-2 md:grid-cols-4">
               <input type="date" value={summaryFrom} onChange={(e) => setSummaryFrom(e.target.value)} className="rounded-lg border px-3 py-2 text-sm" />
               <input type="date" value={summaryTo} onChange={(e) => setSummaryTo(e.target.value)} className="rounded-lg border px-3 py-2 text-sm" />
               <select value={summaryType} onChange={(e) => setSummaryType(e.target.value as "all" | FeedbackType)} className="rounded-lg border px-3 py-2 text-sm">
@@ -232,7 +232,7 @@ export default function MemberDetailPage() {
           </div>
 
           <form onSubmit={submit} className="rounded-xl border bg-white p-4">
-            <div className="grid gap-2 md:grid-cols-[150px_1fr]">
+            <div className="grid gap-2 grid-cols-1 md:grid-cols-[150px_1fr]">
               <select value={type} onChange={(e) => setType(e.target.value as FeedbackType)} className="rounded-lg border px-3 py-2 text-sm">
                 <option value="praise">칭찬</option><option value="growth">성장 피드백</option><option value="improve">개선 필요</option><option value="coaching">코칭</option><option value="other">기타</option>
               </select>
@@ -250,7 +250,7 @@ export default function MemberDetailPage() {
           </form>
 
           <div className="rounded-xl border bg-white p-4">
-            <div className="grid gap-2 md:grid-cols-5">
+            <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
               <select value={filterType} onChange={(e) => setFilterType(e.target.value as "all" | FeedbackType)} className="rounded-lg border px-3 py-2 text-sm">
                 <option value="all">전체 유형</option><option value="praise">칭찬</option><option value="growth">성장 피드백</option><option value="improve">개선 필요</option><option value="coaching">코칭</option><option value="other">기타</option>
               </select>
