@@ -16,6 +16,24 @@ const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
   other: "기타",
 };
 
+/** 문장 단위로 나누어 가독성 높은 단락으로 렌더링 */
+function formatReadableParagraphs(text: string): React.ReactNode {
+  const parts = text
+    .split(/(?<=[다요습니다])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (parts.length <= 1) return <p>{text}</p>;
+  return (
+    <>
+      {parts.map((para, i) => (
+        <p key={i} className={i > 0 ? "pt-2" : undefined}>
+          {para}
+        </p>
+      ))}
+    </>
+  );
+}
+
 function StatCell({
   count,
   onClick,
@@ -344,8 +362,8 @@ export default function MembersPage() {
 
       {selectedMember ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-2xl font-semibold text-slate-900">{selectedMember.name}</h3>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
@@ -361,23 +379,47 @@ export default function MembersPage() {
               </div>
             </div>
 
-            <div className="mt-5 rounded-xl bg-[#F4F8FD] p-4">
-              <p className="text-sm font-semibold text-[#1F4E79]">누적 피드백 요약</p>
-              <p className="mt-2 text-base leading-7 text-slate-700">{selectedInsight?.briefSummary}</p>
+            <div className="flex-1 overflow-y-auto">
+              <div className="mt-5 rounded-xl bg-[#F4F8FD] p-4">
+                <p className="text-sm font-semibold text-[#1F4E79]">누적 피드백 요약</p>
+                <p className="mt-2 text-base leading-7 text-slate-700">{selectedInsight?.briefSummary}</p>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-4 sm:flex-row">
+                <div className="min-w-0 flex-1 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-5 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                    </span>
+                    <p className="text-sm font-bold text-blue-800">추천 멘트</p>
+                  </div>
+                  <div className="space-y-3 text-[15px] leading-[1.8] text-slate-700">
+                    {selectedInsight?.recommendedMent
+                      ? formatReadableParagraphs(selectedInsight.recommendedMent)
+                      : null}
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1 rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50/80 to-white p-5 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                      </svg>
+                    </span>
+                    <p className="text-sm font-bold text-amber-800">액션 플랜</p>
+                  </div>
+                  <div className="space-y-3 text-[15px] leading-[1.8] text-slate-700">
+                    {selectedInsight?.nextActionPlan
+                      ? formatReadableParagraphs(selectedInsight.nextActionPlan)
+                      : null}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-semibold text-slate-700">추천 멘트</p>
-                <p className="mt-2 text-base leading-7 text-slate-700">{selectedInsight?.recommendedMent}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-sm font-semibold text-slate-700">액션 플랜</p>
-                <p className="mt-2 text-base leading-7 text-slate-700">{selectedInsight?.nextActionPlan}</p>
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex shrink-0 justify-end">
               <button
                 type="button"
                 onClick={() => setSelectedMember(null)}

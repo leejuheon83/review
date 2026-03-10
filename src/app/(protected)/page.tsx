@@ -7,7 +7,8 @@ import { apiFetch } from "@/lib/client-api";
 import { validateQuickLogInput } from "@/lib/quick-log-validation";
 import type { Employee, FeedbackLog, FeedbackType } from "@/lib/types";
 
-const monthlyTargetPerMember = 4;
+const TARGET_STORAGE_KEY = "coaching-target-per-member";
+const DEFAULT_TARGET = 4;
 
 function typeMeta(type: FeedbackType): { label: string; icon: string } {
   return (
@@ -49,7 +50,28 @@ export default function DashboardPage() {
   const [editing, setEditing] = useState<FeedbackLog | null>(null);
   const [nowTs] = useState(() => Date.now());
 
+  const [monthlyTargetPerMember, setMonthlyTargetPerMember] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_TARGET;
+    const stored = localStorage.getItem(TARGET_STORAGE_KEY);
+    const n = stored ? parseInt(stored, 10) : DEFAULT_TARGET;
+    return Number.isFinite(n) && n >= 1 && n <= 20 ? n : DEFAULT_TARGET;
+  });
+
   const employeeMap = useMemo(() => new Map(employees.map((e) => [e.id, e.name])), [employees]);
+
+  const [targetSaved, setTargetSaved] = useState(false);
+
+  const adjustTarget = (delta: number) => {
+    setMonthlyTargetPerMember((prev) => Math.max(1, Math.min(20, prev + delta)));
+  };
+
+  const saveTarget = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(TARGET_STORAGE_KEY, String(monthlyTargetPerMember));
+    }
+    setTargetSaved(true);
+    setTimeout(() => setTargetSaved(false), 1500);
+  };
 
   const load = async () => {
     const employeeQuery = feedEmployeeId !== "all" ? `&employeeId=${feedEmployeeId}` : "";
@@ -203,8 +225,48 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border bg-white p-4 text-base text-slate-700">
-        이번 주 코칭 기록을 남겨보세요. 이번 달 목표: 팀원당 {monthlyTargetPerMember}회
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-slate-700">이번 주 코칭 기록을 남겨보세요. 이번 달 목표: 팀원당</span>
+          <div className="inline-flex items-center gap-px rounded-md border border-slate-200 bg-slate-50/80 p-px">
+            <button
+              type="button"
+              onClick={() => adjustTarget(-1)}
+              disabled={monthlyTargetPerMember <= 1}
+              className="flex h-5 w-5 items-center justify-center rounded-sm text-slate-600 transition hover:bg-[#0070C9] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-600"
+              aria-label="목표 감소"
+            >
+              <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+              </svg>
+            </button>
+            <span className="min-w-[1.25rem] px-0.5 text-center text-xs text-slate-900">
+              {monthlyTargetPerMember}
+            </span>
+            <button
+              type="button"
+              onClick={() => adjustTarget(1)}
+              disabled={monthlyTargetPerMember >= 20}
+              className="flex h-5 w-5 items-center justify-center rounded-sm text-slate-600 transition hover:bg-[#0070C9] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-600"
+              aria-label="목표 증가"
+            >
+              <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
+          <span className="text-sm text-slate-700">회</span>
+          <button
+            type="button"
+            onClick={saveTarget}
+            className="rounded bg-[#0070C9] px-2.5 py-1 text-xs font-medium text-white transition hover:bg-[#0059A8]"
+          >
+            저장
+          </button>
+        </div>
+        {targetSaved ? (
+          <span className="text-xs font-medium text-emerald-600">저장됨</span>
+        ) : null}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[420px_1fr]">

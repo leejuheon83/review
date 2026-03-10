@@ -61,6 +61,21 @@ export default function TheoryCard({ content }: TheoryCardProps) {
           ) : null}
         </div>
       ) : null}
+
+      {content.sourceUrl ? (
+        <div className="mt-6 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+          <span className="text-xs font-semibold text-gray-500">원문 / 참고 자료</span>
+          <a
+            href={content.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+          >
+            {content.sourceLabel ?? "원문 보기"}
+            <span aria-hidden>↗</span>
+          </a>
+        </div>
+      ) : null}
     </article>
   );
 }

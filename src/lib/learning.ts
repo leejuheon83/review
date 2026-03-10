@@ -11,6 +11,10 @@ export type LearningContent = {
   exampleBad?: string;
   diagramType: "sbi" | "radical-candor" | "oneonone-flow" | "oneonone-questions";
   tags: string[];
+  /** 원문/참고 자료 URL */
+  sourceUrl?: string;
+  /** 출처 표시 라벨 (예: "Center for Creative Leadership") */
+  sourceLabel?: string;
 };
 
 export const learningContents: LearningContent[] = [
@@ -33,6 +37,8 @@ export const learningContents: LearningContent[] = [
     exampleGood: "오늘 고객 미팅에서 발표 초반에 결론을 먼저 말해줘서, 논의가 빠르게 정리됐어요.",
     diagramType: "sbi",
     tags: ["피드백", "SBI", "칭찬", "개선"],
+    sourceUrl: "https://www.ccl.org/articles/leading-effectively-articles/sbi-feedback-model-a-quick-win-to-improve-talent-conversations-development/",
+    sourceLabel: "Center for Creative Leadership - SBI Feedback Model",
   },
   {
     id: "radical-candor",
@@ -54,6 +60,8 @@ export const learningContents: LearningContent[] = [
       "이번 문서는 정리가 빨라서 좋았어요. 다만 핵심 메시지가 뒤에 나와서, 다음엔 결론을 먼저 두면 더 설득력 있을 것 같아요.",
     diagramType: "radical-candor",
     tags: ["피드백", "Radical Candor", "코칭", "관계"],
+    sourceUrl: "https://www.radicalcandor.com/",
+    sourceLabel: "Radical Candor - Kim Scott",
   },
   {
     id: "positive-feedback",
@@ -75,6 +83,8 @@ export const learningContents: LearningContent[] = [
       "오늘 회의에서 고객 질문을 먼저 정리해줘서 논의가 훨씬 빨리 끝났어요. 다음에도 그 방식으로 진행하면 좋겠어요.",
     diagramType: "sbi",
     tags: ["칭찬", "인정", "동기부여"],
+    sourceUrl: "https://www.ccl.org/articles/leading-effectively-articles/review-time-how-to-give-different-types-of-feedback/",
+    sourceLabel: "CCL - How to Give Feedback Most Effectively",
   },
   {
     id: "oneonone-flow",
@@ -97,6 +107,8 @@ export const learningContents: LearningContent[] = [
       "요즘 가장 에너지 많이 쓰는 일은 뭐예요? 지금 가장 막히는 부분이 있나요? 제가 도와줄 수 있는 건 뭐가 있을까요?",
     diagramType: "oneonone-flow",
     tags: ["1:1", "미팅", "체크인", "성장"],
+    sourceUrl: "https://rework.withgoogle.com/intl/en/guides/managers-coach-managers-to-coach/",
+    sourceLabel: "Google re:Work - Coach managers to coach",
   },
   {
     id: "oneonone-questions",
@@ -119,6 +131,8 @@ export const learningContents: LearningContent[] = [
       "최근 가장 에너지가 많이 드는 일이 뭐예요? 제가 조정해주면 좋은 부분이 있을까요?",
     diagramType: "oneonone-questions",
     tags: ["1:1", "질문", "경청", "성장"],
+    sourceUrl: "https://rework.withgoogle.com/intl/en/guides/managers-coach-managers-to-coach/",
+    sourceLabel: "Google re:Work - Coach managers to coach (1:1 tips)",
   },
 ];
 
