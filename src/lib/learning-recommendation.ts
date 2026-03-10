@@ -31,6 +31,8 @@ export type RecommendationActionItem = {
 export type LearningRecommendation = {
   headline: string;
   reason: string;
+  /** 리더십 진단·리뷰 기록 기반 근거 요약 */
+  basis: string[];
   recommendedContentIds: string[];
   focusArea: "feedback" | "oneonone";
   actionGuideTitle: string;
@@ -65,6 +67,24 @@ export function buildLearningRecommendation(params: {
   const directionScore = leadership.direction ?? 3;
   const communicationScore = leadership.communication ?? 3;
 
+  const buildBasis = (): string[] => {
+    const items: string[] = [];
+    if (leadership.coaching != null || leadership.direction != null || leadership.communication != null) {
+      const parts: string[] = [];
+      if (leadership.coaching != null) parts.push(`코칭 ${coachingScore}점`);
+      if (leadership.direction != null) parts.push(`방향 제시 ${directionScore}점`);
+      if (leadership.communication != null) parts.push(`커뮤니케이션 ${communicationScore}점`);
+      if (parts.length > 0) items.push(`리더십 진단: ${parts.join(", ")}`);
+    }
+    if (totalCount > 0) {
+      items.push(`리뷰 기록: 총 ${totalCount}건 (칭찬 ${praiseCount}건, 개선 ${improveCount}건)`);
+    }
+    if (oneOnOnes.length > 0) {
+      items.push(`1:1 기록: 최근 ${oneOnOnes.length}건`);
+    }
+    return items.length > 0 ? items : ["저장된 진단·리뷰가 없어 기본 추천을 드려요."];
+  };
+
   if (coachingScore <= 3 || (totalCount > 0 && praiseCount === 0)) {
     return {
       headline: "피드백 스킬을 먼저 강화해보세요",
@@ -72,6 +92,7 @@ export function buildLearningRecommendation(params: {
         praiseCount === 0
           ? "최근 피드백 기록에 칭찬 피드백이 거의 없어요. 팀원의 좋은 행동을 구체적으로 강화하는 연습이 먼저 필요해 보여요."
           : "리더십 진단에서 코칭/피드백 영역 점수가 낮아요. 구조화된 피드백 프레임을 먼저 익히는 것이 좋아요.",
+      basis: buildBasis(),
       recommendedContentIds: ["sbi-feedback", "positive-feedback", "radical-candor"],
       focusArea: "feedback",
       actionGuideTitle: "실행 가이드",
@@ -102,6 +123,7 @@ export function buildLearningRecommendation(params: {
       headline: "1:1 미팅 루틴을 다시 세팅해보세요",
       reason:
         "최근 1:1 기록이 많지 않아요. 팀원 상태를 이해하고 지원하기 위한 기본 루틴부터 잡는 것이 좋아요.",
+      basis: buildBasis(),
       recommendedContentIds: ["oneonone-flow", "oneonone-questions"],
       focusArea: "oneonone",
       actionGuideTitle: "실행 가이드",
@@ -132,6 +154,7 @@ export function buildLearningRecommendation(params: {
       headline: "피드백의 톤과 대화 구조를 다듬어보세요",
       reason:
         "개선 중심 대화 비중이 높거나, 방향 제시/커뮤니케이션 점수가 낮아요. 명확하면서도 수용 가능한 대화 방식이 중요해 보여요.",
+      basis: buildBasis(),
       recommendedContentIds: ["radical-candor", "sbi-feedback", "oneonone-questions"],
       focusArea: "feedback",
       actionGuideTitle: "실행 가이드",
@@ -161,6 +184,7 @@ export function buildLearningRecommendation(params: {
     headline: "좋은 루틴을 유지하면서 1:1 질문의 질을 높여보세요",
     reason:
       "현재는 전반적으로 운영이 안정적이에요. 이제는 더 깊은 대화를 이끌 수 있는 질문과 코칭 대화의 질을 높이는 것이 좋아요.",
+    basis: buildBasis(),
     recommendedContentIds: ["oneonone-questions", "positive-feedback", "radical-candor"],
     focusArea: "oneonone",
     actionGuideTitle: "실행 가이드",

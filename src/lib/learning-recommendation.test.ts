@@ -18,6 +18,8 @@ describe("buildLearningRecommendation", () => {
     assert.equal(result.actionGuideTitle.length > 0, true);
     assert.equal(result.actionGuideSummary.length > 0, true);
     assert.equal(result.actionItems.length > 0, true);
+    assert.ok(Array.isArray(result.basis));
+    assert.ok(result.basis.length > 0);
   });
 
   it("returns oneonone focus when one on one logs are not enough", () => {
@@ -32,6 +34,7 @@ describe("buildLearningRecommendation", () => {
     assert.equal(result.focusArea, "oneonone");
     assert.deepEqual(result.recommendedContentIds, ["oneonone-flow", "oneonone-questions"]);
     assert.equal(result.actionItems.length, 3);
+    assert.ok(Array.isArray(result.basis));
   });
 });
 

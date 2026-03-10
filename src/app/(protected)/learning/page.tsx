@@ -103,6 +103,15 @@ export default function LearningPage() {
     return getRecommendedContents(recommendation.recommendedContentIds);
   }, [recommendation]);
 
+  const recommendedByFeedback = useMemo(
+    () => recommendedContents.filter((c) => c.category === "feedback"),
+    [recommendedContents],
+  );
+  const recommendedByOneOnOne = useMemo(
+    () => recommendedContents.filter((c) => c.category === "oneonone"),
+    [recommendedContents],
+  );
+
   const recommendedIds = useMemo(
     () => new Set(recommendedContents.map((content) => content.id)),
     [recommendedContents],
@@ -149,12 +158,42 @@ export default function LearningPage() {
 
             <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
               <h2 className="text-lg font-bold text-gray-900">추천 콘텐츠</h2>
-              <p className="mt-1 text-sm text-gray-500">현재 상태를 기준으로 먼저 보면 좋은 콘텐츠예요.</p>
+              <p className="mt-1 text-sm text-gray-500">
+                리더십 진단·리뷰 기록을 바탕으로 먼저 보면 좋은 콘텐츠예요.
+              </p>
 
-              <div className="mt-5 grid gap-6">
-                {recommendedContents.map((content) => (
-                  <TheoryCard key={content.id} content={content} />
-                ))}
+              <div className="mt-6 space-y-8">
+                {recommendedByFeedback.length > 0 && (
+                  <div>
+                    <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-indigo-600">
+                      피드백 스킬
+                    </h3>
+                    <p className="mb-4 text-sm text-gray-500">추천된 피드백 관련 자료</p>
+                    <div className="grid gap-6">
+                      {recommendedByFeedback.map((content) => (
+                        <TheoryCard key={content.id} content={content} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {recommendedByOneOnOne.length > 0 && (
+                  <div>
+                    <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-indigo-600">
+                      1:1 미팅 가이드
+                    </h3>
+                    <p className="mb-4 text-sm text-gray-500">추천된 1:1 관련 자료</p>
+                    <div className="grid gap-6">
+                      {recommendedByOneOnOne.map((content) => (
+                        <TheoryCard key={content.id} content={content} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {recommendedContents.length === 0 && (
+                  <p className="text-sm text-gray-500">추천 콘텐츠가 없어요.</p>
+                )}
               </div>
             </section>
 
