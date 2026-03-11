@@ -11,6 +11,7 @@ import type { Team } from "@/lib/types";
 const primaryMenus = [
   { label: "대시보드", href: "/" },
   { label: "팀원 관리", href: "/members" },
+  { label: "1:1 면담", href: "/meetings" },
   { label: "학습 자료", href: "/learning" },
 ];
 const leadershipMenu = { label: "내 리더십", href: "/leadership" };

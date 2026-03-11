@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useActor } from "@/components/actor-provider";
+import { MeetingStatusPanelContainer } from "@/components/meetings/MeetingStatusPanelContainer";
 import { apiFetch } from "@/lib/client-api";
 import { validateQuickLogInput } from "@/lib/quick-log-validation";
 import type { Employee, FeedbackLog, FeedbackType } from "@/lib/types";
@@ -385,6 +386,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          <MeetingStatusPanelContainer />
         </section>
       </div>
 
