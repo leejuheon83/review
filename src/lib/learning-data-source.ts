@@ -103,11 +103,28 @@ export async function getRecentFeedbacks(ownerUid: string): Promise<FeedbackReco
   return mapFeedbackLogsToFeedbackRecords(res.items.slice(0, 50));
 }
 
+type MeetingApiItem = {
+  id: string;
+  employeeId: string;
+  meetingDate: string;
+  createdAt?: string;
+};
+
 export async function getRecentOneOnOnes(ownerUid: string): Promise<OneOnOneRecord[]> {
-  const _ownerUid = ownerUid;
-  void _ownerUid;
-  const res = await apiFetch<{ items: FeedbackLogApiItem[] }>(
-    "/api/logs?period=90&type=coaching&sort=latest",
-  );
-  return mapLogsToOneOnOneRecords(res.items.slice(0, 20));
+  const [logsRes, meetingsRes] = await Promise.all([
+    apiFetch<{ items: FeedbackLogApiItem[] }>("/api/logs?period=90&type=coaching&sort=latest"),
+    apiFetch<{ items: MeetingApiItem[] }>(`/api/meetings?managerId=${encodeURIComponent(ownerUid)}`),
+  ]);
+  const fromLogs = mapLogsToOneOnOneRecords(logsRes.items);
+  const fromMeetings = (meetingsRes.items ?? []).map((m) => ({
+    id: m.id,
+    memberId: m.employeeId,
+    createdAt: m.meetingDate ?? m.createdAt ?? "",
+  }));
+  const merged = [...fromLogs, ...fromMeetings].sort((a, b) => {
+    const ta = new Date(a.createdAt ?? 0).getTime();
+    const tb = new Date(b.createdAt ?? 0).getTime();
+    return tb - ta;
+  });
+  return merged.slice(0, 50);
 }

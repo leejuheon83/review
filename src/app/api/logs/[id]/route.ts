@@ -3,6 +3,8 @@ import { db, ensureDbReady, persistDbState } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import type { FeedbackType } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },

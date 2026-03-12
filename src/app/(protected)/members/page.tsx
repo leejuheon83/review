@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/client-api";
 import { buildLeadershipOverview } from "@/lib/leadership-overview";
 import { buildMemberFeedbackInsight } from "@/lib/member-feedback-insight";
 import { buildMemberFeedbackStatMap } from "@/lib/member-feedback-stats";
-import type { Employee, FeedbackLog, FeedbackType, LeadershipAssessment } from "@/lib/types";
+import type { Employee, FeedbackLog, FeedbackType, LeadershipAssessment, MeetingRecord } from "@/lib/types";
 
 const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
   praise: "칭찬",
@@ -59,6 +59,7 @@ export default function MembersPage() {
   const { actor } = useActor();
   const [items, setItems] = useState<Employee[]>([]);
   const [logs, setLogs] = useState<FeedbackLog[]>([]);
+  const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
   const [leadershipLatest, setLeadershipLatest] = useState<LeadershipAssessment | null>(null);
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -81,22 +82,26 @@ export default function MembersPage() {
         apiFetch<{ items: LeadershipAssessment[] }>(
           `/api/leadership-assessments?ownerUid=${encodeURIComponent(actor.id)}`,
         ),
+        apiFetch<{ items: MeetingRecord[] }>(`/api/meetings?managerId=${encodeURIComponent(actor.id)}`),
       );
     }
-    const [membersRes, logsRes, leadershipRes] = (await Promise.all(requestList)) as [
+    const results = await Promise.all(requestList);
+    const [membersRes, logsRes, leadershipRes, meetingsRes] = results as [
       { items: Employee[] },
       { items: FeedbackLog[] },
       { items: LeadershipAssessment[] } | undefined,
+      { items: MeetingRecord[] } | undefined,
     ];
     setItems(membersRes.items);
     setLogs(logsRes.items);
     setLeadershipLatest(leadershipRes?.items?.[0] || null);
+    setMeetings(meetingsRes?.items ?? []);
   };
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const [membersRes, logsRes, leadershipRes] = (await Promise.all([
+      const [membersRes, logsRes, leadershipRes, meetingsRes] = (await Promise.all([
         apiFetch<{ items: Employee[] }>("/api/members"),
         apiFetch<{ items: FeedbackLog[] }>("/api/logs?period=all&type=all"),
         actor?.id
@@ -104,11 +109,20 @@ export default function MembersPage() {
               `/api/leadership-assessments?ownerUid=${encodeURIComponent(actor.id)}`,
             )
           : Promise.resolve(undefined),
-      ])) as [{ items: Employee[] }, { items: FeedbackLog[] }, { items: LeadershipAssessment[] } | undefined];
+        actor?.id
+          ? apiFetch<{ items: MeetingRecord[] }>(`/api/meetings?managerId=${encodeURIComponent(actor.id)}`)
+          : Promise.resolve(undefined),
+      ])) as [
+        { items: Employee[] },
+        { items: FeedbackLog[] },
+        { items: LeadershipAssessment[] } | undefined,
+        { items: MeetingRecord[] } | undefined,
+      ];
       if (cancelled) return;
       setItems(membersRes.items);
       setLogs(logsRes.items);
       setLeadershipLatest(leadershipRes?.items?.[0] || null);
+      setMeetings(meetingsRes?.items ?? []);
     };
     void load();
     return () => {
@@ -143,14 +157,16 @@ export default function MembersPage() {
   const selectedGrowthData = useMemo(() => {
     if (!selectedMember) return null;
     const empLogs = logs.filter((l) => l.employeeId === selectedMember.id);
-    const latest = empLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-    const typeLabel = latest ? FEEDBACK_TYPE_LABELS[latest.type] : "";
+    const empMeetings = meetings.filter((m) => m.employeeId === selectedMember.id);
+    const latestLog = empLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    const latestMeeting = empMeetings.sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime())[0];
+    const typeLabel = latestLog ? FEEDBACK_TYPE_LABELS[latestLog.type] : "";
     return {
       feedbackCount: empLogs.length,
-      lastMeetingDate: latest?.createdAt,
-      recentAction: latest ? `${typeLabel} 피드백` : undefined,
+      lastMeetingDate: latestMeeting?.meetingDate ?? latestLog?.createdAt,
+      recentAction: latestLog ? `${typeLabel} 피드백` : undefined,
     };
-  }, [logs, selectedMember]);
+  }, [logs, meetings, selectedMember]);
 
   const onCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

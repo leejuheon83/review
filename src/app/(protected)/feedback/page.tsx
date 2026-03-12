@@ -160,8 +160,9 @@ export default function FeedbackPage() {
     setEmployeeLogs((prev) => prev.filter((l) => l.id !== logId));
     try {
       await apiFetch(`/api/logs/${logId}`, { method: "DELETE" });
-      await load();
-    } catch {
+    } catch (error) {
+      setNoticeTone("error");
+      setNotice(error instanceof Error ? error.message : "삭제에 실패했습니다. 저장소 설정을 확인해주세요.");
       await load();
     }
   };

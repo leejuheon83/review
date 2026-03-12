@@ -3,6 +3,8 @@ import { db, ensureDbReady, persistDbState } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import type { MeetingRecord, MeetingType } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   await ensureDbReady();
   const actor = getActorFromRequest(req);

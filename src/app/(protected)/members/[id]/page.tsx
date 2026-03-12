@@ -120,8 +120,12 @@ export default function MemberDetailPage() {
 
   const remove = async (id: string) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
-    await apiFetch(`/api/logs/${id}`, { method: "DELETE" });
-    await refresh();
+    try {
+      await apiFetch(`/api/logs/${id}`, { method: "DELETE" });
+      await refresh();
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "삭제에 실패했습니다. 저장소 설정을 확인해주세요.");
+    }
   };
 
   const update = async () => {

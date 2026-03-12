@@ -1,4 +1,5 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getDatabase } from "firebase-admin/database";
 import { getFirestore } from "firebase-admin/firestore";
 
 function getServiceAccountConfig():
@@ -58,6 +59,27 @@ export function getFirestoreAdmin() {
       });
     }
     return getFirestore();
+  } catch {
+    return null;
+  }
+}
+
+/** RTDB 참조 반환. databaseURL이 있을 때만 사용 가능 (Admin SDK로 인증된 읽기/쓰기) */
+export function getRtdbRef(path: string) {
+  const config = getServiceAccountConfig();
+  if (!config?.databaseURL) return null;
+  try {
+    if (!getApps().length) {
+      initializeApp({
+        credential: cert({
+          projectId: config.projectId,
+          clientEmail: config.clientEmail,
+          privateKey: config.privateKey,
+        }),
+        databaseURL: config.databaseURL,
+      });
+    }
+    return getDatabase().ref(path);
   } catch {
     return null;
   }

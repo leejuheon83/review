@@ -6,7 +6,7 @@ import { useActor } from "@/components/actor-provider";
 import { TeamGrowthGarden } from "@/components/growth/TeamGrowthGarden";
 import { MeetingStatusPanelContainer } from "@/components/meetings/MeetingStatusPanelContainer";
 import { apiFetch } from "@/lib/client-api";
-import type { Employee, FeedbackLog, FeedbackType } from "@/lib/types";
+import type { Employee, FeedbackLog, FeedbackType, MeetingRecord } from "@/lib/types";
 
 const FEEDBACK_TYPE_LABELS: Record<FeedbackType, string> = {
   praise: "칭찬",
@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [monthlyLogs, setMonthlyLogs] = useState<FeedbackLog[]>([]);
   const [allLogs, setAllLogs] = useState<FeedbackLog[]>([]);
+  const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
   const [nowTs] = useState(() => Date.now());
 
   const [monthlyTargetPerMember, setMonthlyTargetPerMember] = useState(() => {
@@ -51,16 +52,18 @@ export default function DashboardPage() {
     if (!actor || actor.role !== "MANAGER") return;
     let cancelled = false;
     const loadInEffect = async () => {
-      const [membersRes, monthlyRes, allLogsRes] = await Promise.all([
+      const [membersRes, monthlyRes, allLogsRes, meetingsRes] = await Promise.all([
         apiFetch<{ items: Employee[] }>("/api/members"),
         apiFetch<{ items: FeedbackLog[] }>("/api/logs?period=30&type=all&sort=latest"),
         apiFetch<{ items: FeedbackLog[] }>("/api/logs?period=all&type=all&sort=latest"),
+        apiFetch<{ items: MeetingRecord[] }>(`/api/meetings?managerId=${encodeURIComponent(actor.id)}`),
       ]);
       if (cancelled) return;
       const activeMembers = membersRes.items.filter((e) => e.active);
       setEmployees(activeMembers);
       setMonthlyLogs(monthlyRes.items);
       setAllLogs(allLogsRes.items);
+      setMeetings(meetingsRes.items ?? []);
     };
     void loadInEffect();
     return () => {
@@ -90,17 +93,19 @@ export default function DashboardPage() {
   const growthGardenMembers = useMemo(() => {
     return employees.map((e) => {
       const empLogs = allLogs.filter((l) => l.employeeId === e.id);
-      const latest = empLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-      const typeLabel = latest ? FEEDBACK_TYPE_LABELS[latest.type] : "";
+      const empMeetings = meetings.filter((m) => m.employeeId === e.id);
+      const latestLog = empLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      const latestMeeting = empMeetings.sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime())[0];
+      const typeLabel = latestLog ? FEEDBACK_TYPE_LABELS[latestLog.type] : "";
       return {
         id: e.id,
         name: e.name,
         feedbackCount: empLogs.length,
-        lastMeetingDate: latest?.createdAt,
-        recentAction: latest ? `${typeLabel} 피드백` : undefined,
+        lastMeetingDate: latestMeeting?.meetingDate ?? latestLog?.createdAt,
+        recentAction: latestLog ? `${typeLabel} 피드백` : undefined,
       };
     });
-  }, [employees, allLogs]);
+  }, [employees, allLogs, meetings]);
 
   if (actor?.role === "HR") {
     return (

@@ -6,7 +6,7 @@ import {
   seedTeams,
   seedUsers,
 } from "@/lib/seed";
-import { getFirestoreAdmin, isFirebaseEnabled } from "@/lib/firebase-admin";
+import { getFirestoreAdmin, getRtdbRef, isFirebaseEnabled } from "@/lib/firebase-admin";
 import type {
   Employee,
   FeedbackLog,
@@ -31,7 +31,7 @@ type DBState = {
 
 const FIRESTORE_COLLECTION = "coaching_log";
 const FIRESTORE_DOC_ID = "state_main";
-const RTDB_STATE_PATH = "coaching_log/state_main.json";
+const RTDB_STATE_PATH = "coaching_log/state_main";
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -107,10 +107,26 @@ export async function ensureDbReady(): Promise<void> {
       }
     }
 
+    const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
+    if (rtdbRef) {
+      try {
+        const snap = await rtdbRef.get();
+        const remote = snap.val() as DBState | null;
+        if (!remote) {
+          await rtdbRef.set(clone(db));
+          return;
+        }
+        applyState(remote);
+        return;
+      } catch {
+        // RTDB 실패 시 REST 폴백
+      }
+    }
+
     const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
     if (!rtdbUrl) return;
     const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
-    const stateUrl = `${base}/${RTDB_STATE_PATH}`;
+    const stateUrl = `${base}/${RTDB_STATE_PATH}.json`;
     try {
       const res = await fetch(stateUrl, { method: "GET" });
       if (!res.ok) return;
@@ -144,17 +160,27 @@ export async function persistDbState(): Promise<void> {
     }
   }
 
-  const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
-  if (!rtdbUrl) return;
-  const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
-  const stateUrl = `${base}/${RTDB_STATE_PATH}`;
-  try {
-    await fetch(stateUrl, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(clone(db)),
-    });
-  } catch {
+  const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
+  if (rtdbRef) {
+    await rtdbRef.set(clone(db));
     return;
+  }
+
+  const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
+  if (!rtdbUrl) {
+    throw new Error(
+      "DB 저장소가 설정되지 않았습니다. Vercel 환경변수에 FIREBASE_SERVICE_ACCOUNT_JSON(또는 FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY)과 FIREBASE_DATABASE_URL을 추가해주세요.",
+    );
+  }
+  const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
+  const stateUrl = `${base}/${RTDB_STATE_PATH}.json`;
+  const res = await fetch(stateUrl, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(clone(db)),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`DB 저장 실패 (${res.status}): ${text.slice(0, 200)}`);
   }
 }

@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test \"src/**/*.test.ts\""
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "setup:env": "node scripts/setup-env.js",
+    "vercel:env:pull": "vercel env pull .env.local",
+    "vercel:link": "vercel link && vercel env pull .env.local"
   },
   "dependencies": {
     "firebase": "^12.10.0",

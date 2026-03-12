@@ -11,7 +11,7 @@ export async function apiFetch<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(path, { ...options, headers });
+  const res = await fetch(path, { ...options, headers, cache: "no-store" });
   let data: T & { error?: string };
   try {
     const text = await res.text();
