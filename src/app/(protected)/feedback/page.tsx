@@ -156,8 +156,14 @@ export default function FeedbackPage() {
 
   const deleteLog = async (logId: string) => {
     if (!confirm("이 피드백을 삭제하시겠습니까?")) return;
-    await apiFetch(`/api/logs/${logId}`, { method: "DELETE" });
-    await load();
+    setRecentLogs((prev) => prev.filter((l) => l.id !== logId));
+    setEmployeeLogs((prev) => prev.filter((l) => l.id !== logId));
+    try {
+      await apiFetch(`/api/logs/${logId}`, { method: "DELETE" });
+      await load();
+    } catch {
+      await load();
+    }
   };
 
   const fetchAiSuggestions = async () => {
