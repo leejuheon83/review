@@ -1,101 +1,115 @@
 "use client";
 
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  orderBy,
-  query,
-  serverTimestamp,
-  Timestamp,
-  updateDoc,
-  where,
-} from "firebase/firestore";
-import type { Timestamp as TimestampType } from "firebase/firestore";
-import { getFirebaseDb } from "@/lib/firebase";
+import { apiFetch } from "@/lib/client-api";
 import type { Meeting, MeetingFormData, MeetingInput, MeetingType } from "@/types/meeting";
 
-const COLLECTION = "meetings";
+type MeetingApiDoc = {
+  id: string;
+  managerId: string;
+  managerName: string;
+  employeeId: string;
+  employeeName: string;
+  meetingType: MeetingType;
+  meetingDate: string;
+  goalSummary: string;
+  discussionNotes: string;
+  managerComment: string;
+  supportNeeded: string;
+  actionItems: string;
+  nextMeetingDate: string | null;
+  aiSummary: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
-function getDb() {
-  const db = getFirebaseDb();
-  if (!db) throw new Error("Firebase Firestore is not initialized.");
-  return db;
-}
-
-function toTimestamp(v: Date | TimestampType): TimestampType {
-  if (v instanceof Date) return Timestamp.fromDate(v);
-  return v;
+function toMeeting(d: MeetingApiDoc): Meeting {
+  return {
+    ...d,
+    meetingDate: { toDate: () => new Date(d.meetingDate) } as Meeting["meetingDate"],
+    nextMeetingDate: d.nextMeetingDate
+      ? ({ toDate: () => new Date(d.nextMeetingDate!) } as Meeting["nextMeetingDate"])
+      : null,
+    createdAt: { toDate: () => new Date(d.createdAt) } as Meeting["createdAt"],
+    updatedAt: { toDate: () => new Date(d.updatedAt) } as Meeting["updatedAt"],
+  };
 }
 
 export async function createMeeting(input: MeetingFormData | MeetingInput): Promise<string> {
-  const db = getDb();
-  const ref = await addDoc(collection(db, COLLECTION), {
-    managerId: input.managerId,
-    managerName: input.managerName,
-    employeeId: input.employeeId,
-    employeeName: input.employeeName,
-    meetingType: input.meetingType,
-    meetingDate: toTimestamp(input.meetingDate),
-    goalSummary: input.goalSummary || "",
-    discussionNotes: input.discussionNotes || "",
-    managerComment: input.managerComment || "",
-    supportNeeded: input.supportNeeded || "",
-    actionItems: input.actionItems || "",
-    nextMeetingDate: input.nextMeetingDate ? toTimestamp(input.nextMeetingDate) : null,
-    aiSummary: input.aiSummary || "",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+  const meetingDate = input.meetingDate instanceof Date ? input.meetingDate : (input.meetingDate as { toDate: () => Date }).toDate();
+  const nextMeetingDate = input.nextMeetingDate
+    ? (input.nextMeetingDate instanceof Date ? input.nextMeetingDate : (input.nextMeetingDate as { toDate: () => Date }).toDate())
+    : null;
+  const res = await apiFetch<{ id: string }>("/api/meetings", {
+    method: "POST",
+    body: JSON.stringify({
+      managerId: input.managerId,
+      managerName: input.managerName,
+      employeeId: input.employeeId,
+      employeeName: input.employeeName,
+      meetingType: input.meetingType,
+      meetingDate: meetingDate.toISOString(),
+      goalSummary: input.goalSummary || "",
+      discussionNotes: input.discussionNotes || "",
+      managerComment: input.managerComment || "",
+      supportNeeded: input.supportNeeded || "",
+      actionItems: input.actionItems || "",
+      nextMeetingDate: nextMeetingDate ? nextMeetingDate.toISOString() : null,
+      aiSummary: input.aiSummary || "",
+    }),
   });
-  return ref.id;
+  return res.id;
 }
 
 export async function getMeetings(managerId: string, typeFilter?: MeetingType): Promise<Meeting[]> {
-  const db = getDb();
-  const q = query(
-    collection(db, COLLECTION),
-    where("managerId", "==", managerId),
-    orderBy("meetingDate", "desc"),
-  );
-  const snapshot = await getDocs(q);
-  let items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Meeting[];
-  if (typeFilter) {
-    items = items.filter((m) => m.meetingType === typeFilter);
-  }
-  return items;
+  const params = new URLSearchParams({ managerId });
+  if (typeFilter) params.set("type", typeFilter);
+  const res = await apiFetch<{ items: MeetingApiDoc[] }>(`/api/meetings?${params}`);
+  return res.items.map(toMeeting);
 }
 
 export async function getMeetingById(id: string): Promise<Meeting | null> {
-  const db = getDb();
-  const snap = await getDoc(doc(db, COLLECTION, id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as Meeting;
+  const res = await apiFetch<{ item: MeetingApiDoc | null }>(`/api/meetings/${id}`);
+  return res.item ? toMeeting(res.item) : null;
 }
 
 export async function updateMeeting(id: string, input: Partial<MeetingFormData | MeetingInput>): Promise<void> {
-  const db = getDb();
-  const payload: Record<string, unknown> = {
-    ...input,
-    updatedAt: serverTimestamp(),
-  };
-  if (input.meetingDate) payload.meetingDate = toTimestamp(input.meetingDate);
-  if (input.nextMeetingDate !== undefined) {
-    payload.nextMeetingDate = input.nextMeetingDate ? toTimestamp(input.nextMeetingDate) : null;
+  const payload: Record<string, unknown> = { ...input };
+  if (input.meetingDate) {
+    payload.meetingDate =
+      input.meetingDate instanceof Date
+        ? input.meetingDate.toISOString()
+        : (input.meetingDate as { toDate: () => Date }).toDate().toISOString();
   }
-  delete (payload as Record<string, unknown>).createdAt;
-  await updateDoc(doc(db, COLLECTION, id), payload);
+  if (input.nextMeetingDate !== undefined) {
+    payload.nextMeetingDate = input.nextMeetingDate
+      ? (input.nextMeetingDate instanceof Date
+          ? input.nextMeetingDate
+          : (input.nextMeetingDate as { toDate: () => Date }).toDate()
+        ).toISOString()
+      : null;
+  }
+  await apiFetch<{ ok: boolean }>(`/api/meetings/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function deleteMeeting(id: string): Promise<void> {
-  const db = getDb();
-  await deleteDoc(doc(db, COLLECTION, id));
+  await apiFetch<{ ok: boolean }>(`/api/meetings/${id}`, { method: "DELETE" });
 }
 
-export function formatMeetingDate(ts: TimestampType | Date | string): string {
+export function formatMeetingDate(ts: Meeting["meetingDate"] | Date | string): string {
   if (typeof ts === "string") return new Date(ts).toLocaleDateString("ko-KR");
-  const d = ts instanceof Date ? ts : ts.toDate();
+  const d = ts instanceof Date ? ts : (ts as { toDate: () => Date }).toDate();
   return d.toLocaleDateString("ko-KR");
+}
+
+/** Firestore Timestamp 또는 Date를 Date로 변환 */
+export function toDate(
+  ts: Meeting["meetingDate"] | Meeting["nextMeetingDate"] | Date | null | undefined,
+): Date | null {
+  if (!ts) return null;
+  if (ts instanceof Date) return ts;
+  if (typeof ts === "object" && "toDate" in ts) return (ts as { toDate: () => Date }).toDate();
+  return new Date(ts as string);
 }

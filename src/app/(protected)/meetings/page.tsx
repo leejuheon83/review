@@ -40,35 +40,39 @@ export default function MeetingsPage() {
       return () => clearTimeout(t);
     }
   }, []);
-  const managerName = actor?.name || "";
 
   useEffect(() => {
+    if (!managerId) return;
     let cancelled = false;
-    const load = async () => {
-      if (!managerId) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      setError(null);
-      try {
-        const [meetingsRes, membersRes] = await Promise.all([
-          getMeetings(managerId, typeFilter === "all" ? undefined : typeFilter),
-          apiFetch<{ items: Employee[] }>("/api/members").catch(() => ({ items: MOCK_TEAM_MEMBERS })),
-        ]);
-        if (cancelled) return;
-        setMeetings(meetingsRes);
-        setEmployees(membersRes.items?.length ? membersRes.items : MOCK_TEAM_MEMBERS);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "면담 목록을 불러오는데 실패했습니다.");
-          setEmployees(MOCK_TEAM_MEMBERS);
-        }
-      } finally {
+    apiFetch<{ items: Employee[] }>("/api/members")
+      .then((res) => {
+        if (!cancelled && res.items?.length) setEmployees(res.items);
+        else if (!cancelled) setEmployees(MOCK_TEAM_MEMBERS);
+      })
+      .catch(() => {
+        if (!cancelled) setEmployees(MOCK_TEAM_MEMBERS);
+      });
+    return () => { cancelled = true; };
+  }, [managerId]);
+
+  useEffect(() => {
+    if (!managerId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getMeetings(managerId, typeFilter === "all" ? undefined : typeFilter)
+      .then((res) => {
+        if (!cancelled) setMeetings(res);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "면담 목록을 불러오는데 실패했습니다.");
+      })
+      .finally(() => {
         if (!cancelled) setLoading(false);
-      }
-    };
-    void load();
+      });
     return () => { cancelled = true; };
   }, [managerId, typeFilter]);
 

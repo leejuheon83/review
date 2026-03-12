@@ -14,7 +14,7 @@ npm install
 
 `.env.local`에 아래 항목을 추가하면 Firestore를 영구 저장소로 사용합니다.
 설정이 없으면 기존 메모리 시드 DB로 동작합니다.
-서비스 계정 키가 없더라도 `FIREBASE_DATABASE_URL`만 있으면 Realtime Database REST로 상태를 저장합니다.
+서비스 계정 키가 없더라도 `FIREBASE_DATABASE_URL`만 있으면 Realtime Database REST로 상태를 저장합니다. 면담 기록(1:1 면담)도 동일한 저장소를 사용합니다.
 
 ```bash
 # Firebase Web SDK (client)

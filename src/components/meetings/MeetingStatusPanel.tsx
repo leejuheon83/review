@@ -22,7 +22,7 @@ export function MeetingStatusPanel({
   noRecentMeetingCount,
 }: MeetingStatusPanelProps) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="h-full rounded-xl border border-slate-200 bg-white p-4">
       <h3 className="text-lg font-semibold text-slate-900">1:1 면담 현황</h3>
       <div className="mt-4 grid grid-cols-3 gap-3">
         <div className="rounded-lg bg-slate-50 p-3">

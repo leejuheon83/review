@@ -14,6 +14,7 @@ export default function NewMeetingPage() {
   const { actor } = useActor();
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const managerId = actor?.id || "";
   const managerName = actor?.name || "";
@@ -25,11 +26,16 @@ export default function NewMeetingPage() {
   }, []);
 
   const handleSubmit = async (input: MeetingFormData) => {
-    const id = await createMeeting(input);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("meeting-toast", "면담 기록이 저장되었습니다.");
+    setSubmitError(null);
+    try {
+      await createMeeting(input);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("meeting-toast", "면담 기록이 저장되었습니다.");
+      }
+      router.push("/meetings");
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "저장에 실패했습니다.");
     }
-    router.push(`/meetings/${id}`);
   };
 
   const handleCancel = () => router.push("/meetings");
@@ -45,6 +51,11 @@ export default function NewMeetingPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-6 text-2xl font-bold text-slate-900">면담 기록 작성</h1>
+      {submitError && (
+        <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {submitError}
+        </div>
+      )}
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <MeetingForm
           employees={employees}

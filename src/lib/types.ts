@@ -76,3 +76,24 @@ export type LeadershipAssessment = {
   memo: string;
   createdAt: string;
 };
+
+export type MeetingType = "goal" | "quarterly" | "coaching" | "general";
+
+export type MeetingRecord = {
+  id: string;
+  managerId: string;
+  managerName: string;
+  employeeId: string;
+  employeeName: string;
+  meetingType: MeetingType;
+  meetingDate: string;
+  goalSummary: string;
+  discussionNotes: string;
+  managerComment: string;
+  supportNeeded: string;
+  actionItems: string;
+  nextMeetingDate: string | null;
+  aiSummary: string;
+  createdAt: string;
+  updatedAt: string;
+};

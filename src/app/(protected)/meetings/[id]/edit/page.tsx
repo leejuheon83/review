@@ -19,29 +19,33 @@ export default function EditMeetingPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const managerId = actor?.id || "";
   const managerName = actor?.name || "";
 
   useEffect(() => {
-    Promise.all([
-      getMeetingById(id),
-      apiFetch<{ items: Employee[] }>("/api/members").catch(() => ({ items: MOCK_TEAM_MEMBERS })),
-    ])
-      .then(([m, res]) => {
-        setMeeting(m || null);
-        setEmployees(res.items?.length ? res.items : MOCK_TEAM_MEMBERS);
-      })
+    apiFetch<{ items: Employee[] }>("/api/members")
+      .then((res) => setEmployees(res.items?.length ? res.items : MOCK_TEAM_MEMBERS))
+      .catch(() => setEmployees(MOCK_TEAM_MEMBERS));
+
+    getMeetingById(id)
+      .then((m) => setMeeting(m || null))
       .catch((e) => setError(e instanceof Error ? e.message : "불러오기 실패"))
       .finally(() => setLoading(false));
   }, [id]);
 
   const handleSubmit = async (input: MeetingFormData) => {
-    await updateMeeting(id, input);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("meeting-toast", "면담 기록이 수정되었습니다.");
+    setSubmitError(null);
+    try {
+      await updateMeeting(id, input);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("meeting-toast", "면담 기록이 수정되었습니다.");
+      }
+      router.push("/meetings");
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "수정에 실패했습니다.");
     }
-    router.push(`/meetings/${id}`);
   };
 
   const handleCancel = () => router.push(`/meetings/${id}`);
@@ -65,6 +69,11 @@ export default function EditMeetingPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-6 text-2xl font-bold text-slate-900">면담 기록 수정</h1>
+      {submitError && (
+        <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {submitError}
+        </div>
+      )}
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <MeetingForm
           employees={employees}

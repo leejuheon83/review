@@ -20,25 +20,24 @@ export function MeetingStatusPanelContainer() {
   const managerId = actor?.id || "";
 
   useEffect(() => {
+    apiFetch<{ items: Employee[] }>("/api/members")
+      .then((res) => setEmployees(res.items?.length ? res.items : MOCK_TEAM_MEMBERS))
+      .catch(() => setEmployees(MOCK_TEAM_MEMBERS));
+  }, []);
+
+  useEffect(() => {
     if (!managerId) {
       setLoading(false);
       return;
     }
     let cancelled = false;
-    Promise.all([
-      apiFetch<{ items: Employee[] }>("/api/members").catch(() => ({ items: MOCK_TEAM_MEMBERS })),
-      getMeetings(managerId).catch(() => []),
-    ])
-      .then(([membersRes, meetingsRes]) => {
-        if (cancelled) return;
-        setEmployees(membersRes.items?.length ? membersRes.items : MOCK_TEAM_MEMBERS);
-        setMeetings(Array.isArray(meetingsRes) ? meetingsRes : []);
+    setLoading(true);
+    getMeetings(managerId)
+      .then((res) => {
+        if (!cancelled) setMeetings(res);
       })
       .catch(() => {
-        if (!cancelled) {
-          setEmployees(MOCK_TEAM_MEMBERS);
-          setMeetings([]);
-        }
+        if (!cancelled) setMeetings([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

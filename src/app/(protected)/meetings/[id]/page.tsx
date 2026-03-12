@@ -118,31 +118,39 @@ export default function MeetingDetailPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-6 space-y-4">
-          <Section title="기본 정보">
-            <div className="space-y-1">
-              <p><span className="font-medium">팀원:</span> {meeting.employeeName}</p>
-              <p><span className="font-medium">면담 유형:</span> {MEETING_TYPE_LABELS[meeting.meetingType]}</p>
-              <p><span className="font-medium">면담일:</span> {meetingDate ? formatMeetingDate(meetingDate) : "-"}</p>
-              {nextDate && (
-                <p><span className="font-medium">다음 면담 예정일:</span> {formatMeetingDate(nextDate)}</p>
-              )}
-            </div>
-          </Section>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-xs font-medium text-slate-500">팀원명</p>
+            <p className="mt-1 font-semibold text-slate-900">{meeting.employeeName}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-slate-500">면담 유형</p>
+            <p className="mt-1 font-semibold text-slate-900">{MEETING_TYPE_LABELS[meeting.meetingType]}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-slate-500">면담일</p>
+            <p className="mt-1 font-semibold text-slate-900">{meetingDate ? formatMeetingDate(meetingDate) : "-"}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-slate-500">다음 면담 예정일</p>
+            <p className="mt-1 font-semibold text-slate-900">{nextDate ? formatMeetingDate(nextDate) : "-"}</p>
+          </div>
+        </div>
+      </div>
 
-          <Section title="외부 목표 요약">{meeting.goalSummary}</Section>
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="space-y-4">
+          <Section title="목표 요약">{meeting.goalSummary}</Section>
           <Section title="주요 논의 내용">{meeting.discussionNotes}</Section>
           <Section title="팀장 코멘트">{meeting.managerComment}</Section>
           <Section title="지원 필요 사항">{meeting.supportNeeded}</Section>
           <Section title="합의된 액션">{meeting.actionItems}</Section>
 
-          {meeting.aiSummary && (
-            <Section title="AI 요약">{meeting.aiSummary}</Section>
-          )}
+          {meeting.aiSummary ? <Section title="AI 요약">{meeting.aiSummary}</Section> : null}
         </div>
 
-        <div className="border-t border-slate-200 pt-4">
+        <div className="mt-6 border-t border-slate-200 pt-4">
           <button
             type="button"
             onClick={handleDelete}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useActor } from "@/components/actor-provider";
+import { PlantGrowthCard } from "@/components/growth/PlantGrowthCard";
 import { apiFetch } from "@/lib/client-api";
 import { buildLeadershipOverview } from "@/lib/leadership-overview";
 import { buildMemberFeedbackInsight } from "@/lib/member-feedback-insight";
@@ -138,6 +139,18 @@ export default function MembersPage() {
       leadershipSignal,
     );
   }, [logs, leadershipSignal, selectedMember]);
+
+  const selectedGrowthData = useMemo(() => {
+    if (!selectedMember) return null;
+    const empLogs = logs.filter((l) => l.employeeId === selectedMember.id);
+    const latest = empLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    const typeLabel = latest ? FEEDBACK_TYPE_LABELS[latest.type] : "";
+    return {
+      feedbackCount: empLogs.length,
+      lastMeetingDate: latest?.createdAt,
+      recentAction: latest ? `${typeLabel} 피드백` : undefined,
+    };
+  }, [logs, selectedMember]);
 
   const onCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -288,7 +301,7 @@ export default function MembersPage() {
         </table>
       </div>
       <p className="text-sm text-slate-500">
-        * 팀원 클릭시 피드백 요약 및 추천 코칭 멘트가 팝업으로 활성화 됩니다.
+        * 팀원 클릭시 피드백 요약, 추천 코칭 멘트, 성장 정원이 팝업으로 표시됩니다.
       </p>
 
       {open ? (
@@ -416,6 +429,18 @@ export default function MembersPage() {
                       : null}
                   </div>
                 </div>
+              </div>
+
+              <div className="mt-5 rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
+                <p className="mb-4 text-sm font-semibold text-slate-700">성장 정원</p>
+                {selectedMember && selectedGrowthData && (
+                  <PlantGrowthCard
+                    employeeName={selectedMember.name}
+                    feedbackCount={selectedGrowthData.feedbackCount}
+                    lastMeetingDate={selectedGrowthData.lastMeetingDate}
+                    recentAction={selectedGrowthData.recentAction}
+                  />
+                )}
               </div>
             </div>
 

@@ -11,6 +11,7 @@ import type {
   Employee,
   FeedbackLog,
   LeadershipAssessment,
+  MeetingRecord,
   MemberNote,
   Summary,
   Team,
@@ -25,6 +26,7 @@ type DBState = {
   notes: MemberNote[];
   summaries: Summary[];
   leadershipAssessments: LeadershipAssessment[];
+  meetings: MeetingRecord[];
 };
 
 const FIRESTORE_COLLECTION = "coaching_log";
@@ -47,6 +49,7 @@ function createSeedState(): DBState {
     notes: clone(seedNotes),
     summaries: clone(seedSummaries),
     leadershipAssessments: [],
+    meetings: [],
   };
 }
 
@@ -61,7 +64,9 @@ if (needsSeedRefresh(globalForDB.coachingLogDB)) {
   globalForDB.coachingLogDB = createSeedState();
 }
 
-export const db: DBState = globalForDB.coachingLogDB as DBState;
+const dbRef = globalForDB.coachingLogDB as DBState;
+if (!Array.isArray(dbRef.meetings)) dbRef.meetings = [];
+export const db: DBState = dbRef;
 
 function applyState(state: DBState) {
   db.users = clone(state.users);
@@ -73,6 +78,7 @@ function applyState(state: DBState) {
   db.leadershipAssessments = clone(
     Array.isArray(state.leadershipAssessments) ? state.leadershipAssessments : [],
   );
+  db.meetings = clone(Array.isArray(state.meetings) ? state.meetings : []);
 }
 
 export async function ensureDbReady(): Promise<void> {
