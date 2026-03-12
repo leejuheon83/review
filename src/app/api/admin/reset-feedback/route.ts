@@ -14,18 +14,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  await ensureDbReady();
+  try {
+    await ensureDbReady();
 
-  db.logs = [...seedLogs];
-  db.notes = [...seedNotes];
-  db.summaries = [...seedSummaries];
-  db.leadershipAssessments = [];
-  db.meetings = [];
+    db.logs = [...seedLogs];
+    db.notes = [...seedNotes];
+    db.summaries = [...seedSummaries];
+    db.leadershipAssessments = [];
+    db.meetings = [];
 
-  await persistDbState();
+    await persistDbState();
 
-  return NextResponse.json({
-    ok: true,
-    message: "피드백·노트·요약·리더십·미팅 데이터가 초기화되었습니다.",
-  });
+    return NextResponse.json({
+      ok: true,
+      message: "피드백·노트·요약·리더십·미팅 데이터가 초기화되었습니다.",
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[reset-feedback]", message);
+    return NextResponse.json(
+      { error: "Reset failed", detail: message },
+      { status: 500 },
+    );
+  }
 }

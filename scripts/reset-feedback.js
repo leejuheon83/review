@@ -56,7 +56,7 @@ const req = requestModule.request(options, (res) => {
     let errMsg = `HTTP ${res.statusCode}`;
     try {
       const json = data ? JSON.parse(data) : {};
-      if (json.error) errMsg = json.error;
+      if (json.error) errMsg = json.detail ? `${json.error}: ${json.detail}` : json.error;
     } catch {
       /* ignore */
     }
@@ -66,6 +66,9 @@ const req = requestModule.request(options, (res) => {
     }
     if (res.statusCode === 401) {
       console.error("  → Vercel 환경변수 RESET_SECRET과 .env.local의 값이 일치하는지 확인하세요.");
+    }
+    if (res.statusCode === 500) {
+      console.error("  → Vercel에 FIREBASE_* 환경변수가 설정되어 있는지 확인하세요.");
     }
     process.exit(1);
   });
