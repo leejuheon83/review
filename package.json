@@ -9,27 +9,29 @@
     "lint": "eslint",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "setup:env": "node scripts/setup-env.js",
+    "reset:feedback": "node scripts/reset-feedback.js",
+    "reset:feedback:prod": "node scripts/reset-feedback.js --prod",
     "vercel:env:pull": "vercel env pull .env.local",
     "vercel:link": "vercel link && vercel env pull .env.local"
   },
   "dependencies": {
-    "firebase": "^12.10.0",
-    "firebase-admin": "^13.7.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
-    "firebase-tools": "^13.0.0",
-    "vercel": "^39.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "firebase": "^12.10.0",
+    "firebase-admin": "^13.7.0",
+    "firebase-tools": "^15.9.1",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vercel": "^50.32.3"
   }
 }

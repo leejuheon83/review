@@ -22,8 +22,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Deploy Firestore rules
-        run: npx firebase-tools deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_TOKEN"
+      - name: Deploy Firebase rules (Firestore + Database)
+        run: npx firebase-tools deploy --only firestore:rules,database --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_TOKEN"
         env:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

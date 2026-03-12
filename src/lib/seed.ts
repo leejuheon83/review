@@ -110,27 +110,7 @@ function daysAgo(days: number): string {
   return d.toISOString();
 }
 
-const logTypes: FeedbackLog["type"][] = ["praise", "coaching", "improve", "growth", "other"];
-const logTags = ["협업", "리더십", "책임감", "업무품질", "고객대응"];
-const logMemos = [
-  "업무 공유가 명확해 팀 전체 진행 속도에 도움이 되었습니다.",
-  "다음 업무 시작 전 우선순위와 완료 기준을 먼저 정리해보면 좋겠습니다.",
-  "고객 커뮤니케이션에서 핵심 포인트를 잘 정리해 전달했습니다.",
-  "회의 전 안건을 사전에 공유하면 의사결정이 더 빨라질 것 같습니다.",
-  "리스크를 먼저 정리하는 습관을 유지하면 실행 안정성이 높아집니다.",
-];
-
-export const seedLogs: FeedbackLog[] = seedEmployees.slice(0, 36).map((employee, idx) => ({
-  id: `log_${idx + 1}`,
-  employeeId: employee.id,
-  managerId: employee.managerId,
-  type: logTypes[idx % logTypes.length],
-  memo: logMemos[idx % logMemos.length],
-  tags: [logTags[idx % logTags.length]],
-  pinned: idx % 7 === 0,
-  createdAt: daysAgo((idx % 27) + 1),
-  updatedAt: daysAgo((idx % 27) + 1),
-}));
+export const seedLogs: FeedbackLog[] = [];
 
 export const seedNotes: MemberNote[] = [
   ...seedUsers.slice(0, 6).map((manager, idx) => {

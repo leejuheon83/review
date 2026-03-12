@@ -60,7 +60,7 @@ npm run dev
 
 `master` 브랜치에 push하면 자동으로 아래 순서로 배포됩니다. 수동 실행도 가능합니다.
 
-1. Firebase Firestore Rules 배포
+1. Firebase Rules 배포 (Firestore + Realtime Database)
 2. Vercel Production 배포
 
 워크플로우 파일:
@@ -95,6 +95,16 @@ FIREBASE_DATABASE_URL=https://your-project-default-rtdb.asia-southeast1.firebase
 ```
 
 클라이언트용 Firebase (로그인 등)은 `NEXT_PUBLIC_*` 환경변수를 Vercel에 동일하게 설정하세요.
+
+### Vercel-Firebase 로컬 연동
+
+Vercel에 등록된 환경변수를 로컬로 가져오려면:
+
+```bash
+npm run vercel:link    # 프로젝트 연결 + 환경변수 pull
+# 또는
+npm run vercel:env:pull   # 환경변수만 pull (.env.local 덮어씀)
+```
 
 ## 주요 화면
 

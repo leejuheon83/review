@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "coaching_log": {
+      ".read": "false",
+      ".write": "false"
+    }
+  }
+}
