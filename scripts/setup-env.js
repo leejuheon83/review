@@ -2,7 +2,7 @@
 /**
  * 환경변수 설정 안내
  * - .env.local 이 없으면 .env.example 을 복사
- * - Vercel 연동 시 필요한 변수 안내
+ * - Firebase + Vercel 연동 가이드: docs/vercel-firebase-setup.md
  */
 const fs = require("fs");
 const path = require("path");
@@ -20,11 +20,11 @@ if (!fs.existsSync(envLocal) && fs.existsSync(envExample)) {
   console.log("⚠ .env.example 이 없습니다.");
 }
 
-console.log("\n[Vercel 연동]");
-console.log("1. Vercel 대시보드 → 프로젝트 → Settings → Environment Variables");
-console.log("2. .env.example 참고하여 아래 변수 추가:");
-console.log("   - NEXT_PUBLIC_FIREBASE_* (클라이언트)");
-console.log("   - FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY");
-console.log("   - FIREBASE_DATABASE_URL");
-console.log("3. 또는: npm run vercel:env:pull (Vercel에 이미 설정된 경우)");
+console.log("\n[Firebase + Vercel 연동]");
+console.log("  상세 가이드: docs/vercel-firebase-setup.md");
+console.log("");
+console.log("  로컬: .env.local 에 Firebase 변수 추가");
+console.log("  Vercel: Settings > Environment Variables 에 동일 변수 추가");
+console.log("  Vercel 변수 Pull: npm run vercel:env:pull");
+console.log("  프로젝트 연결: npm run vercel:link");
 console.log("");

@@ -76,6 +76,9 @@ function NavContent({
             <Link href="/hr" className={navClassFn(pathname.startsWith("/hr"))}>
               HR 대시보드
             </Link>
+            <Link href="/admin" className={navClassFn(pathname.startsWith("/admin"))}>
+              부서/팀장/팀원 관리
+            </Link>
           </>
         ) : null}
       </nav>

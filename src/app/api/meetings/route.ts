@@ -19,7 +19,15 @@ export async function GET(req: Request) {
   }
 
   const meetings = Array.isArray(db.meetings) ? db.meetings : [];
-  let items = meetings.filter((m) => m.managerId === managerId);
+  let items: typeof meetings;
+  if (actor.role === "HR") {
+    items =
+      managerId === actor.id || !params.has("managerId")
+        ? meetings
+        : meetings.filter((m) => m.managerId === managerId);
+  } else {
+    items = meetings.filter((m) => m.managerId === managerId);
+  }
   if (type) items = items.filter((m) => m.meetingType === type);
   items = [...items].sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
 
@@ -92,11 +100,7 @@ export async function POST(req: Request) {
     };
     if (!Array.isArray(db.meetings)) db.meetings = [];
     db.meetings.unshift(record);
-    try {
-      await persistDbState();
-    } catch {
-      // 저장소 실패해도 메모리에 있으므로 성공으로 처리
-    }
+    await persistDbState();
     return NextResponse.json({ id }, { status: 201 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "면담 기록 저장 실패";

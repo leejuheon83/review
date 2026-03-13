@@ -7,6 +7,11 @@ import {
   seedUsers,
 } from "@/lib/seed";
 import { getFirestoreAdmin, getRtdbRef, isFirebaseEnabled } from "@/lib/firebase-admin";
+import {
+  isGoogleSheetsEnabled,
+  readDbStateFromSheets,
+  writeDbStateToSheets,
+} from "@/lib/google-sheets-db";
 import type {
   Employee,
   FeedbackLog,
@@ -124,35 +129,49 @@ export async function ensureDbReady(): Promise<void> {
     }
 
     const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
-    if (!rtdbUrl) return;
-    const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
-    const stateUrl = `${base}/${RTDB_STATE_PATH}.json`;
-    try {
-      const res = await fetch(stateUrl, { method: "GET" });
-      if (!res.ok) return;
-      const remote = (await res.json()) as DBState | null;
-      if (!remote) {
-        await fetch(stateUrl, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(clone(db)),
-        });
+    if (rtdbUrl) {
+      const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
+      const stateUrl = `${base}/${RTDB_STATE_PATH}.json`;
+      try {
+        const res = await fetch(stateUrl, { method: "GET" });
+        if (res.ok) {
+          const remote = (await res.json()) as DBState | null;
+          if (remote) {
+            applyState(remote);
+            return;
+          }
+        }
+      } catch {
+        // REST 실패 시 Google Sheets 폴백
+      }
+    }
+
+    if (isGoogleSheetsEnabled()) {
+      try {
+        const remote = await readDbStateFromSheets();
+        if (remote) {
+          applyState(remote);
+          return;
+        }
+      } catch {
         return;
       }
-      applyState(remote);
-    } catch {
-      return;
     }
   })();
   await globalForDBReady.coachingLogDBReady;
 }
 
 export async function persistDbState(): Promise<void> {
+  const state = clone(db);
+
   if (isFirebaseEnabled()) {
     const firestore = getFirestoreAdmin();
     if (firestore) {
       try {
-        await firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID).set(clone(db));
+        await firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID).set(state);
+        if (isGoogleSheetsEnabled()) {
+          writeDbStateToSheets(state).catch(() => {});
+        }
         return;
       } catch {
         // Firestore 저장 실패 시 RTDB 폴백
@@ -162,25 +181,38 @@ export async function persistDbState(): Promise<void> {
 
   const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
   if (rtdbRef) {
-    await rtdbRef.set(clone(db));
+    await rtdbRef.set(state);
+    if (isGoogleSheetsEnabled()) {
+      writeDbStateToSheets(state).catch(() => {});
+    }
     return;
   }
 
   const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
-  if (!rtdbUrl) {
-    throw new Error(
-      "DB 저장소가 설정되지 않았습니다. Vercel 환경변수에 FIREBASE_SERVICE_ACCOUNT_JSON(또는 FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY)과 FIREBASE_DATABASE_URL을 추가해주세요.",
-    );
-  }
-  const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
-  const stateUrl = `${base}/${RTDB_STATE_PATH}.json`;
-  const res = await fetch(stateUrl, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(clone(db)),
-  });
-  if (!res.ok) {
+  if (rtdbUrl) {
+    const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
+    const stateUrl = `${base}/${RTDB_STATE_PATH}.json`;
+    const res = await fetch(stateUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state),
+    });
+    if (res.ok) {
+      if (isGoogleSheetsEnabled()) {
+        writeDbStateToSheets(state).catch(() => {});
+      }
+      return;
+    }
     const text = await res.text();
     throw new Error(`DB 저장 실패 (${res.status}): ${text.slice(0, 200)}`);
   }
+
+  if (isGoogleSheetsEnabled()) {
+    await writeDbStateToSheets(state);
+    return;
+  }
+
+  throw new Error(
+    "DB 저장소가 설정되지 않았습니다. Vercel 환경변수에 FIREBASE_SERVICE_ACCOUNT_JSON(또는 FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY)과 FIREBASE_DATABASE_URL, 또는 GOOGLE_SPREADSHEET_ID를 추가해주세요.",
+  );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useActor } from "@/components/actor-provider";
 import { apiFetch } from "@/lib/client-api";
@@ -62,6 +63,9 @@ export default function EditMeetingPage() {
     return (
       <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
         {error || "면담 기록을 찾을 수 없습니다."}
+        <Link href="/meetings" className="mt-4 block text-sm font-medium underline">
+          목록으로
+        </Link>
       </div>
     );
   }

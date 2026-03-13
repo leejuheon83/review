@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useActor } from "@/components/actor-provider";
 import { apiFetch } from "@/lib/client-api";
-import { getMeetings } from "@/lib/meetings";
+import { getMeetings, deleteMeeting } from "@/lib/meetings";
 import { MOCK_TEAM_MEMBERS } from "@/lib/mockTeamMembers";
 import type { Employee } from "@/lib/types";
 import type { Meeting, MeetingType } from "@/types/meeting";
@@ -82,6 +82,28 @@ export default function MeetingsPage() {
     return meetings.filter((m) => m.employeeName.toLowerCase().includes(q));
   }, [meetings, searchQuery]);
 
+  const refreshMeetings = () => {
+    if (!managerId) return;
+    getMeetings(managerId, typeFilter === "all" ? undefined : typeFilter)
+      .then(setMeetings)
+      .catch((e) => setError(e instanceof Error ? e.message : "면담 목록을 불러오는데 실패했습니다."));
+  };
+
+  const handleDeleteMeeting = async (id: string) => {
+    if (!confirm("이 면담 기록을 삭제하시겠습니까?")) return;
+    try {
+      await deleteMeeting(id);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("meeting-toast", "면담 기록이 삭제되었습니다.");
+      }
+      setToast("면담 기록이 삭제되었습니다.");
+      setTimeout(() => setToast(""), 3000);
+      refreshMeetings();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "삭제에 실패했습니다.");
+    }
+  };
+
   if (!managerId) {
     return (
       <div className="rounded-xl border bg-white p-8 text-center text-slate-600">
@@ -90,16 +112,20 @@ export default function MeetingsPage() {
     );
   }
 
+  const isHR = actor?.role === "HR";
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-slate-900">1:1 면담 기록</h1>
-        <Link
-          href="/meetings/new"
-          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#0070C9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0059A8]"
-        >
-          면담 기록 작성
-        </Link>
+        {!isHR && (
+          <Link
+            href="/meetings/new"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#0070C9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0059A8]"
+          >
+            면담 기록 작성
+          </Link>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -145,7 +171,10 @@ export default function MeetingsPage() {
           면담 목록을 불러오는 중...
         </div>
       ) : (
-        <MeetingList meetings={filteredMeetings} />
+        <MeetingList
+          meetings={filteredMeetings}
+          onDelete={isHR ? undefined : handleDeleteMeeting}
+        />
       )}
     </div>
   );

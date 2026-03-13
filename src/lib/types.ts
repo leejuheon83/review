@@ -97,3 +97,14 @@ export type MeetingRecord = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type DBState = {
+  users: User[];
+  teams: Team[];
+  employees: Employee[];
+  logs: FeedbackLog[];
+  notes: MemberNote[];
+  summaries: Summary[];
+  leadershipAssessments: LeadershipAssessment[];
+  meetings: MeetingRecord[];
+};

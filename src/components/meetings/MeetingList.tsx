@@ -6,9 +6,10 @@ import { MeetingCard } from "./MeetingCard";
 type MeetingListProps = {
   meetings: Meeting[];
   emptyMessage?: string;
+  onDelete?: (id: string) => Promise<void>;
 };
 
-export function MeetingList({ meetings, emptyMessage = "아직 등록된 면담 기록이 없습니다." }: MeetingListProps) {
+export function MeetingList({ meetings, emptyMessage = "아직 등록된 면담 기록이 없습니다.", onDelete }: MeetingListProps) {
   if (meetings.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-12 text-center">
@@ -21,7 +22,7 @@ export function MeetingList({ meetings, emptyMessage = "아직 등록된 면담 
   return (
     <div className="space-y-3">
       {meetings.map((m) => (
-        <MeetingCard key={m.id} meeting={m} />
+        <MeetingCard key={m.id} meeting={m} onDelete={onDelete} />
       ))}
     </div>
   );
