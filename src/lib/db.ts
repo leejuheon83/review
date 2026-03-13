@@ -44,6 +44,8 @@ function clone<T>(value: T): T {
 
 const globalForDB = globalThis as unknown as { coachingLogDB?: DBState };
 const globalForDBReady = globalThis as unknown as { coachingLogDBReady?: Promise<void> };
+const globalForDBLoadedAt = globalThis as unknown as { coachingLogDBLoadedAt?: number };
+const CACHE_TTL_MS = 0;
 
 function createSeedState(): DBState {
   return {
@@ -86,16 +88,7 @@ function applyState(state: DBState) {
   db.meetings = clone(Array.isArray(state.meetings) ? state.meetings : []);
 }
 
-/**
- * Load order: RTDB first when FIREBASE_DATABASE_URL is set (docs say RTDB is primary),
- * then Firestore, REST, Google Sheets. Single source consistency prevents data loss.
- */
-export async function ensureDbReady(): Promise<void> {
-  if (globalForDBReady.coachingLogDBReady) {
-    await globalForDBReady.coachingLogDBReady;
-    return;
-  }
-  globalForDBReady.coachingLogDBReady = (async () => {
+async function loadFromPrimary(): Promise<void> {
     const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
     if (rtdbRef) {
       try {
@@ -160,53 +153,156 @@ export async function ensureDbReady(): Promise<void> {
         // fall through
       }
     }
+}
+
+/**
+ * Load order: RTDB first, then REST, Firestore, Google Sheets.
+ * Uses short TTL cache (2s) so reads see recent writes from other instances.
+ */
+export async function ensureDbReady(): Promise<void> {
+  const now = Date.now();
+  const loadedAt = globalForDBLoadedAt.coachingLogDBLoadedAt ?? 0;
+  if (now - loadedAt < CACHE_TTL_MS && globalForDBReady.coachingLogDBReady) {
+    await globalForDBReady.coachingLogDBReady;
+    return;
+  }
+  globalForDBReady.coachingLogDBReady = (async () => {
+    await loadFromPrimary();
+    globalForDBLoadedAt.coachingLogDBLoadedAt = Date.now();
   })();
   await globalForDBReady.coachingLogDBReady;
 }
 
 /**
- * Atomically mutate DB state using RTDB transaction. Prevents serverless race condition
- * where multiple instances overwrite each other's writes (read-modify-write).
- * Falls back to direct persist when RTDB is unavailable.
+ * Atomically mutate DB state. Prevents serverless race condition where multiple
+ * instances overwrite each other (read-modify-write). Uses RTDB transaction
+ * first, then Firestore transaction, then reload+persist as last resort.
  */
 export async function mutateDbWithTransaction(
   updater: (state: DBState) => DBState,
 ): Promise<void> {
+  const seed = createSeedState();
+
   const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
   if (rtdbRef) {
-    const seed = createSeedState();
-    const result = await rtdbRef.transaction((current) => {
-      const base = (current as DBState | null) || seed;
-      const next = updater(clone(base));
-      return next;
-    });
-    if (result.committed) {
-      applyState(result.snapshot.val() as DBState);
-      await syncToSecondary(result.snapshot.val() as DBState);
-      return;
+    try {
+      const result = await rtdbRef.transaction((current) => {
+        const base = (current as DBState | null) || seed;
+        return updater(clone(base));
+      });
+      if (result.committed) {
+        const committed = result.snapshot.val() as DBState;
+        applyState(committed);
+        await syncToSecondary(committed);
+        return;
+      }
+    } catch {
+      // RTDB transaction failed, try Firestore
     }
   }
 
+  const firestore = getFirestoreAdmin();
+  if (firestore) {
+    try {
+      const docRef = firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID);
+      const next = await firestore.runTransaction(async (transaction) => {
+        const snap = await transaction.get(docRef);
+        const current = snap.exists ? (snap.data() as DBState) : null;
+        const base = current || seed;
+        const updated = updater(clone(base));
+        transaction.set(docRef, updated);
+        return updated;
+      });
+      applyState(next);
+      await syncToSecondary(next);
+      return;
+    } catch {
+      // Firestore transaction failed
+    }
+  }
+
+  await reloadFromPrimary();
   const next = updater(clone(db));
   applyState(next);
   await persistDbState();
 }
 
-async function syncToSecondary(state: DBState): Promise<void> {
-  const s = clone(state);
-  if (isFirebaseEnabled()) {
-    const firestore = getFirestoreAdmin();
-    if (firestore) {
-      try {
-        await firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID).set(s);
-      } catch {
-        // ignore
+async function reloadFromPrimary(): Promise<void> {
+  const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
+  if (rtdbRef) {
+    try {
+      const snap = await rtdbRef.get();
+      const remote = snap.val() as DBState | null;
+      if (remote) {
+        applyState(remote);
+        return;
       }
+    } catch {
+      // ignore
     }
   }
-  if (isGoogleSheetsEnabled()) {
-    writeDbStateToSheets(s).catch(() => {});
+
+  const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
+  if (rtdbUrl) {
+    try {
+      const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
+      const res = await fetch(`${base}/${RTDB_STATE_PATH}.json`, { method: "GET" });
+      if (res.ok) {
+        const remote = (await res.json()) as DBState | null;
+        if (remote) {
+          applyState(remote);
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
   }
+
+  const firestore = getFirestoreAdmin();
+  if (firestore) {
+    try {
+      const snap = await firestore
+        .collection(FIRESTORE_COLLECTION)
+        .doc(FIRESTORE_DOC_ID)
+        .get();
+      if (snap.exists) {
+        const data = snap.data() as DBState | undefined;
+        if (data) {
+          applyState(data);
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (isGoogleSheetsEnabled()) {
+    try {
+      const remote = await readDbStateFromSheets();
+      if (remote) {
+        applyState(remote);
+      }
+    } catch {
+      // ignore
+    }
+  }
+}
+
+async function syncToSecondary(state: DBState): Promise<void> {
+  const s = clone(state);
+  const tasks: Promise<unknown>[] = [];
+  const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
+  if (rtdbRef) tasks.push(rtdbRef.set(s));
+  const firestore = getFirestoreAdmin();
+  if (firestore) {
+    tasks.push(
+      firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID).set(s),
+    );
+  }
+  if (isGoogleSheetsEnabled()) tasks.push(writeDbStateToSheets(s));
+  await Promise.allSettled(tasks);
 }
 
 export async function persistDbState(): Promise<void> {
