@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { defaultPasswordForUser, employeeNoFromUser } from "@/lib/auth";
 
 type ResetPasswordBody = {
@@ -19,8 +19,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "해당 사원번호 계정을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  user.password = defaultPasswordForUser(user);
-  await persistDbState();
+  const userId = user.id;
+  const defaultPw = defaultPasswordForUser(user);
+  await mutateDbWithTransaction((state) => {
+    const users = Array.isArray(state.users) ? [...state.users] : [];
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx === -1) return state;
+    users[idx] = { ...users[idx], password: defaultPw };
+    return { ...state, users };
+  });
   return NextResponse.json({
     ok: true,
     message: "비밀번호가 개인 사번으로 초기화되었습니다.",

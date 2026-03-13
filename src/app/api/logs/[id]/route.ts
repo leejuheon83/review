@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import type { FeedbackType } from "@/lib/types";
 
@@ -28,20 +28,29 @@ export async function PATCH(
     pinned?: boolean;
   };
 
-  if (body.memo !== undefined) {
-    const memo = body.memo.trim();
-    if (memo.length < 5 || memo.length > 200) {
-      return NextResponse.json({ error: "메모는 5~200자여야 합니다." }, { status: 400 });
-    }
-    item.memo = memo;
+  const now = new Date().toISOString();
+  const memo = body.memo !== undefined ? body.memo.trim() : item.memo;
+  if (memo.length < 5 || memo.length > 200) {
+    return NextResponse.json({ error: "메모는 5~200자여야 합니다." }, { status: 400 });
   }
-  if (body.type) item.type = body.type;
-  if (body.tags) item.tags = body.tags.slice(0, 6);
-  if (typeof body.pinned === "boolean") item.pinned = body.pinned;
-  item.updatedAt = new Date().toISOString();
-  await persistDbState();
 
-  return NextResponse.json({ item });
+  await mutateDbWithTransaction((state) => {
+    const logs = Array.isArray(state.logs) ? [...state.logs] : [];
+    const idx = logs.findIndex((l) => l.id === id);
+    if (idx === -1) return state;
+    logs[idx] = {
+      ...logs[idx],
+      memo,
+      type: body.type ?? logs[idx].type,
+      tags: body.tags ? body.tags.slice(0, 6) : logs[idx].tags,
+      pinned: typeof body.pinned === "boolean" ? body.pinned : logs[idx].pinned,
+      updatedAt: now,
+    };
+    return { ...state, logs };
+  });
+
+  const updated = db.logs.find((l) => l.id === id);
+  return NextResponse.json({ item: updated ?? item });
 }
 
 export async function DELETE(
@@ -60,7 +69,9 @@ export async function DELETE(
     return forbidden("본인 작성 기록만 삭제할 수 있습니다.");
   }
 
-  db.logs.splice(idx, 1);
-  await persistDbState();
+  await mutateDbWithTransaction((state) => {
+    const logs = Array.isArray(state.logs) ? state.logs.filter((l) => l.id !== id) : [];
+    return { ...state, logs };
+  });
   return NextResponse.json({ ok: true });
 }

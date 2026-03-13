@@ -86,45 +86,29 @@ function applyState(state: DBState) {
   db.meetings = clone(Array.isArray(state.meetings) ? state.meetings : []);
 }
 
+/**
+ * Load order: RTDB first when FIREBASE_DATABASE_URL is set (docs say RTDB is primary),
+ * then Firestore, REST, Google Sheets. Single source consistency prevents data loss.
+ */
 export async function ensureDbReady(): Promise<void> {
   if (globalForDBReady.coachingLogDBReady) {
     await globalForDBReady.coachingLogDBReady;
     return;
   }
   globalForDBReady.coachingLogDBReady = (async () => {
-    if (isFirebaseEnabled()) {
-      const firestore = getFirestoreAdmin();
-      if (firestore) {
-        try {
-          const ref = firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID);
-          const snap = await ref.get();
-          if (!snap.exists) {
-            await ref.set(clone(db));
-            return;
-          }
-          const data = snap.data() as DBState | undefined;
-          if (!data) return;
-          applyState(data);
-          return;
-        } catch {
-          // Firestore API disabled/권한 이슈 시 RTDB 폴백
-        }
-      }
-    }
-
     const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
     if (rtdbRef) {
       try {
         const snap = await rtdbRef.get();
         const remote = snap.val() as DBState | null;
-        if (!remote) {
-          await rtdbRef.set(clone(db));
+        if (remote) {
+          applyState(remote);
           return;
         }
-        applyState(remote);
+        await rtdbRef.set(clone(db));
         return;
       } catch {
-        // RTDB 실패 시 REST 폴백
+        // RTDB 실패 시 다음 소스 시도
       }
     }
 
@@ -142,7 +126,26 @@ export async function ensureDbReady(): Promise<void> {
           }
         }
       } catch {
-        // REST 실패 시 Google Sheets 폴백
+        // REST 실패 시 다음 소스 시도
+      }
+    }
+
+    if (isFirebaseEnabled()) {
+      const firestore = getFirestoreAdmin();
+      if (firestore) {
+        try {
+          const ref = firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID);
+          const snap = await ref.get();
+          if (snap.exists) {
+            const data = snap.data() as DBState | undefined;
+            if (data) {
+              applyState(data);
+              return;
+            }
+          }
+        } catch {
+          // Firestore 실패 시 다음 소스 시도
+        }
       }
     }
 
@@ -154,11 +157,56 @@ export async function ensureDbReady(): Promise<void> {
           return;
         }
       } catch {
-        return;
+        // fall through
       }
     }
   })();
   await globalForDBReady.coachingLogDBReady;
+}
+
+/**
+ * Atomically mutate DB state using RTDB transaction. Prevents serverless race condition
+ * where multiple instances overwrite each other's writes (read-modify-write).
+ * Falls back to direct persist when RTDB is unavailable.
+ */
+export async function mutateDbWithTransaction(
+  updater: (state: DBState) => DBState,
+): Promise<void> {
+  const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
+  if (rtdbRef) {
+    const seed = createSeedState();
+    const result = await rtdbRef.transaction((current) => {
+      const base = (current as DBState | null) || seed;
+      const next = updater(clone(base));
+      return next;
+    });
+    if (result.committed) {
+      applyState(result.snapshot.val() as DBState);
+      await syncToSecondary(result.snapshot.val() as DBState);
+      return;
+    }
+  }
+
+  const next = updater(clone(db));
+  applyState(next);
+  await persistDbState();
+}
+
+async function syncToSecondary(state: DBState): Promise<void> {
+  const s = clone(state);
+  if (isFirebaseEnabled()) {
+    const firestore = getFirestoreAdmin();
+    if (firestore) {
+      try {
+        await firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID).set(s);
+      } catch {
+        // ignore
+      }
+    }
+  }
+  if (isGoogleSheetsEnabled()) {
+    writeDbStateToSheets(s).catch(() => {});
+  }
 }
 
 export async function persistDbState(): Promise<void> {

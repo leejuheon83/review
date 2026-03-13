@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ensureDbReady, persistDbState, db } from "@/lib/db";
+import { ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { seedLogs, seedNotes, seedSummaries } from "@/lib/seed";
 
 /**
@@ -17,13 +17,14 @@ export async function POST(req: Request) {
   try {
     await ensureDbReady();
 
-    db.logs = [...seedLogs];
-    db.notes = [...seedNotes];
-    db.summaries = [...seedSummaries];
-    db.leadershipAssessments = [];
-    db.meetings = [];
-
-    await persistDbState();
+    await mutateDbWithTransaction((state) => ({
+      ...state,
+      logs: [...seedLogs],
+      notes: [...seedNotes],
+      summaries: [...seedSummaries],
+      leadershipAssessments: [],
+      meetings: [],
+    }));
 
     return NextResponse.json({
       ok: true,

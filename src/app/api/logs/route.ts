@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import type { FeedbackType } from "@/lib/types";
 
@@ -90,7 +90,10 @@ export async function POST(req: Request) {
     createdAt: now,
     updatedAt: now,
   };
-  db.logs.unshift(item);
-  await persistDbState();
+  await mutateDbWithTransaction((state) => {
+    const logs = Array.isArray(state.logs) ? state.logs : [];
+    if (logs.some((l) => l.id === item.id)) return state;
+    return { ...state, logs: [item, ...logs] };
+  });
   return NextResponse.json({ item }, { status: 201 });
 }

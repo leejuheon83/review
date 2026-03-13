@@ -1,4 +1,4 @@
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import type { Employee, FeedbackLog, Summary, SummaryFilters, User } from "@/lib/types";
 
 const INSUFFICIENT_MESSAGE =
@@ -244,36 +244,55 @@ export async function generateEmployeeSummary(
   const summaryText = generateSummaryText(logs);
   const status = logs.length < 2 ? "insufficient" : "generated";
 
-  if (existing) {
-    existing.sourceLogIds = sourceLogIds;
-    existing.sourceFingerprint = sourceFingerprint;
-    existing.summaryText = summaryText;
-    existing.modelVersion = MODEL_VERSION;
-    existing.createdByUserId = input.actor.id;
-    existing.updatedAt = now;
-    existing.filters = filters;
-    if (!input.store) {
-      await persistDbState();
+  const summary: Summary = existing
+    ? {
+        ...existing,
+        sourceLogIds,
+        sourceFingerprint,
+        summaryText,
+        modelVersion: MODEL_VERSION,
+        createdByUserId: input.actor.id,
+        updatedAt: now,
+        filters,
+      }
+    : {
+        id: `summary_${Date.now()}`,
+        scopeType: "EMPLOYEE" as const,
+        scopeId: input.employeeId,
+        filters,
+        sourceLogIds,
+        sourceFingerprint,
+        summaryText,
+        modelVersion: MODEL_VERSION,
+        createdByUserId: input.actor.id,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+  if (input.store) {
+    if (existing) {
+      Object.assign(existing, summary);
+    } else {
+      store.summaries.unshift(summary);
     }
-    return { status, summary: existing, usedLogs: logs, prompt };
+    return { status, summary, usedLogs: logs, prompt };
   }
 
-  const summary: Summary = {
-    id: `summary_${Date.now()}`,
-    scopeType: "EMPLOYEE",
-    scopeId: input.employeeId,
-    filters,
-    sourceLogIds,
-    sourceFingerprint,
-    summaryText,
-    modelVersion: MODEL_VERSION,
-    createdByUserId: input.actor.id,
-    createdAt: now,
-    updatedAt: now,
-  };
-  store.summaries.unshift(summary);
-  if (!input.store) {
-    await persistDbState();
-  }
+  await mutateDbWithTransaction((state) => {
+    const summaries = Array.isArray(state.summaries) ? [...state.summaries] : [];
+    const idx = summaries.findIndex(
+      (s) =>
+        s.scopeType === "EMPLOYEE" &&
+        s.scopeId === input.employeeId &&
+        eqFilters(s.filters, filters),
+    );
+    if (idx >= 0) {
+      summaries[idx] = summary;
+    } else {
+      summaries.unshift(summary);
+    }
+    return { ...state, summaries };
+  });
+
   return { status, summary, usedLogs: logs, prompt };
 }

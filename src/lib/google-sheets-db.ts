@@ -96,7 +96,7 @@ export async function readDbStateFromSheets(): Promise<DBState | null> {
     const sheetName = getSheetName();
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${sheetName}!A1:A1000`,
+      range: `${sheetName}!A1:A5000`,
     });
     const rows = res.data.values as string[][] | undefined;
     if (!rows?.length) return null;

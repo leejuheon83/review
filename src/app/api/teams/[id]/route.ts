@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import type { Team } from "@/lib/types";
 
@@ -21,9 +21,15 @@ export async function PATCH(
   const team = db.teams.find((t) => t.id === id);
   if (!team) return NextResponse.json({ error: "부서를 찾을 수 없습니다." }, { status: 404 });
 
-  team.name = body.name.trim();
-  await persistDbState();
-  return NextResponse.json({ item: team });
+  const newName = body.name.trim();
+  await mutateDbWithTransaction((state) => {
+    const teams = Array.isArray(state.teams) ? [...state.teams] : [];
+    const idx = teams.findIndex((t) => t.id === id);
+    if (idx === -1) return state;
+    teams[idx] = { ...teams[idx], name: newName };
+    return { ...state, teams };
+  });
+  return NextResponse.json({ item: { ...team, name: newName } });
 }
 
 export async function DELETE(
@@ -48,7 +54,9 @@ export async function DELETE(
     );
   }
 
-  db.teams.splice(idx, 1);
-  await persistDbState();
+  await mutateDbWithTransaction((state) => {
+    const teams = Array.isArray(state.teams) ? state.teams.filter((t) => t.id !== id) : [];
+    return { ...state, teams };
+  });
   return NextResponse.json({ ok: true });
 }

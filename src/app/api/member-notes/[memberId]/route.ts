@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 
 export async function GET(
@@ -38,21 +38,23 @@ export async function PATCH(
   const now = new Date().toISOString();
 
   const existing = db.notes.find((n) => n.memberId === memberId && n.ownerUid === actor.id);
-  if (existing) {
-    existing.nextAction = nextAction;
-    existing.updatedAt = now;
-    await persistDbState();
-    return NextResponse.json({ item: existing });
-  }
+  await mutateDbWithTransaction((state) => {
+    const notes = Array.isArray(state.notes) ? [...state.notes] : [];
+    const idx = notes.findIndex((n) => n.memberId === memberId && n.ownerUid === actor.id);
+    if (idx >= 0) {
+      notes[idx] = { ...notes[idx], nextAction, updatedAt: now };
+    } else {
+      notes.unshift({
+        id: `note_${Date.now()}`,
+        ownerUid: actor.id,
+        memberId,
+        nextAction,
+        updatedAt: now,
+      });
+    }
+    return { ...state, notes };
+  });
 
-  const item = {
-    id: `note_${Date.now()}`,
-    ownerUid: actor.id,
-    memberId,
-    nextAction,
-    updatedAt: now,
-  };
-  db.notes.unshift(item);
-  await persistDbState();
-  return NextResponse.json({ item });
+  const saved = db.notes.find((n) => n.memberId === memberId && n.ownerUid === actor.id);
+  return NextResponse.json({ item: saved! });
 }

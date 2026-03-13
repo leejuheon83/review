@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import type { Team } from "@/lib/types";
 
@@ -21,8 +21,11 @@ export async function POST(req: Request) {
 
   const id = `team_${Date.now()}`;
   const newTeam: Team = { id, name: body.name.trim() };
-  db.teams.push(newTeam);
-  await persistDbState();
+  await mutateDbWithTransaction((state) => {
+    const teams = Array.isArray(state.teams) ? state.teams : [];
+    if (teams.some((t) => t.id === newTeam.id)) return state;
+    return { ...state, teams: [...teams, newTeam] };
+  });
   return NextResponse.json({ item: newTeam }, { status: 201 });
 }
 

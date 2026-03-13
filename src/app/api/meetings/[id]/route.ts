@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import type { MeetingRecord, MeetingType } from "@/lib/types";
 
@@ -60,18 +60,23 @@ export async function PATCH(
   }
 
   const now = new Date().toISOString();
-  if (body.meetingType !== undefined) existing.meetingType = body.meetingType;
-  if (body.meetingDate !== undefined) existing.meetingDate = body.meetingDate;
-  if (body.goalSummary !== undefined) existing.goalSummary = body.goalSummary;
-  if (body.discussionNotes !== undefined) existing.discussionNotes = body.discussionNotes;
-  if (body.managerComment !== undefined) existing.managerComment = body.managerComment;
-  if (body.supportNeeded !== undefined) existing.supportNeeded = body.supportNeeded;
-  if (body.actionItems !== undefined) existing.actionItems = body.actionItems;
-  if (body.nextMeetingDate !== undefined) existing.nextMeetingDate = body.nextMeetingDate;
-  if (body.aiSummary !== undefined) existing.aiSummary = body.aiSummary;
-  existing.updatedAt = now;
-
-  await persistDbState();
+  await mutateDbWithTransaction((state) => {
+    const meetings = Array.isArray(state.meetings) ? [...state.meetings] : [];
+    const idx = meetings.findIndex((m) => m.id === id);
+    if (idx === -1) return state;
+    const m = meetings[idx];
+    if (body.meetingType !== undefined) m.meetingType = body.meetingType;
+    if (body.meetingDate !== undefined) m.meetingDate = body.meetingDate;
+    if (body.goalSummary !== undefined) m.goalSummary = body.goalSummary;
+    if (body.discussionNotes !== undefined) m.discussionNotes = body.discussionNotes;
+    if (body.managerComment !== undefined) m.managerComment = body.managerComment;
+    if (body.supportNeeded !== undefined) m.supportNeeded = body.supportNeeded;
+    if (body.actionItems !== undefined) m.actionItems = body.actionItems;
+    if (body.nextMeetingDate !== undefined) m.nextMeetingDate = body.nextMeetingDate;
+    if (body.aiSummary !== undefined) m.aiSummary = body.aiSummary;
+    m.updatedAt = now;
+    return { ...state, meetings };
+  });
   return NextResponse.json({ ok: true });
 }
 
@@ -93,7 +98,9 @@ export async function DELETE(
     return forbidden("본인 면담 기록만 삭제할 수 있습니다.");
   }
 
-  if (Array.isArray(db.meetings)) db.meetings.splice(idx, 1);
-  await persistDbState();
+  await mutateDbWithTransaction((state) => {
+    const meetings = Array.isArray(state.meetings) ? state.meetings.filter((m) => m.id !== id) : [];
+    return { ...state, meetings };
+  });
   return NextResponse.json({ ok: true });
 }

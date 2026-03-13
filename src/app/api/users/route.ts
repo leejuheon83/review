@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import type { User } from "@/lib/types";
 
@@ -50,8 +50,11 @@ export async function POST(req: Request) {
     teamId: body.teamId,
     password: employeeNo,
   };
-  db.users.unshift(newUser);
-  await persistDbState();
+  await mutateDbWithTransaction((state) => {
+    const users = Array.isArray(state.users) ? state.users : [];
+    if (users.some((u) => u.id === newUser.id)) return state;
+    return { ...state, users: [newUser, ...users] };
+  });
 
   const { password: _p, ...safe } = newUser;
   return NextResponse.json({ item: safe }, { status: 201 });

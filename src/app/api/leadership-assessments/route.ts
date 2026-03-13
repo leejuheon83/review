@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 
 export async function GET(req: Request) {
@@ -59,11 +59,11 @@ export async function POST(req: Request) {
     createdAt: new Date().toISOString(),
   };
 
-  if (!Array.isArray(db.leadershipAssessments)) {
-    db.leadershipAssessments = [];
-  }
-  db.leadershipAssessments.unshift(item);
-  await persistDbState();
+  await mutateDbWithTransaction((state) => {
+    const assessments = Array.isArray(state.leadershipAssessments) ? state.leadershipAssessments : [];
+    if (assessments.some((a) => a.id === item.id)) return state;
+    return { ...state, leadershipAssessments: [item, ...assessments] };
+  });
 
   return NextResponse.json({ item }, { status: 201 });
 }

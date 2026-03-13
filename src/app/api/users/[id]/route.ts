@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import type { User } from "@/lib/types";
 
@@ -27,11 +27,19 @@ export async function PATCH(
   if (body.teamId !== undefined) {
     const team = db.teams.find((t) => t.id === body.teamId);
     if (!team) return NextResponse.json({ error: "부서를 찾을 수 없습니다." }, { status: 404 });
-    user.teamId = body.teamId;
   }
 
-  await persistDbState();
-  const { password: _p, ...safe } = user;
+  await mutateDbWithTransaction((state) => {
+    const users = Array.isArray(state.users) ? [...state.users] : [];
+    const idx = users.findIndex((u) => u.id === id);
+    if (idx === -1) return state;
+    const u = users[idx];
+    if (body.name !== undefined) u.name = String(body.name).trim();
+    if (body.teamId !== undefined) u.teamId = body.teamId;
+    return { ...state, users };
+  });
+  const updated = db.users.find((u) => u.id === id);
+  const { password: _p, ...safe } = updated ?? user;
   return NextResponse.json({ item: safe });
 }
 
@@ -61,7 +69,9 @@ export async function DELETE(
     );
   }
 
-  db.users.splice(idx, 1);
-  await persistDbState();
+  await mutateDbWithTransaction((state) => {
+    const users = Array.isArray(state.users) ? state.users.filter((u) => u.id !== id) : [];
+    return { ...state, users };
+  });
   return NextResponse.json({ ok: true });
 }

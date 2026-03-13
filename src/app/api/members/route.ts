@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { getActorFromRequest, unauthorized } from "@/lib/auth";
 
 export async function GET(req: Request) {
@@ -62,7 +62,10 @@ export async function POST(req: Request) {
     managerId,
     active: true,
   };
-  db.employees.unshift(newItem);
-  await persistDbState();
+  await mutateDbWithTransaction((state) => {
+    const employees = Array.isArray(state.employees) ? state.employees : [];
+    if (employees.some((e) => e.id === newItem.id)) return state;
+    return { ...state, employees: [newItem, ...employees] };
+  });
   return NextResponse.json({ item: newItem }, { status: 201 });
 }

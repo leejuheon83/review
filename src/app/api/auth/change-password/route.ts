@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { employeeNoFromUser, verifyCredential } from "@/lib/auth";
 
 type ChangePasswordBody = {
@@ -28,7 +28,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "현재 비밀번호가 올바르지 않습니다." }, { status: 401 });
   }
 
-  user.password = newPassword;
-  await persistDbState();
+  const userId = user.id;
+  await mutateDbWithTransaction((state) => {
+    const users = Array.isArray(state.users) ? [...state.users] : [];
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx === -1) return state;
+    users[idx] = { ...users[idx], password: newPassword };
+    return { ...state, users };
+  });
   return NextResponse.json({ ok: true });
 }

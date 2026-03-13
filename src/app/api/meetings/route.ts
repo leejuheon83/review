@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, persistDbState } from "@/lib/db";
+import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import type { MeetingRecord, MeetingType } from "@/lib/types";
 
@@ -98,9 +98,11 @@ export async function POST(req: Request) {
       createdAt: now,
       updatedAt: now,
     };
-    if (!Array.isArray(db.meetings)) db.meetings = [];
-    db.meetings.unshift(record);
-    await persistDbState();
+    await mutateDbWithTransaction((state) => {
+      const meetings = Array.isArray(state.meetings) ? state.meetings : [];
+      if (meetings.some((m) => m.id === record.id)) return state;
+      return { ...state, meetings: [record, ...meetings] };
+    });
     return NextResponse.json({ id }, { status: 201 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "면담 기록 저장 실패";
