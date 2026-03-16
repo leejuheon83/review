@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
+import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
 import { seedLogs, seedNotes, seedSummaries } from "@/lib/seed";
 
 /**
@@ -8,9 +9,20 @@ import { seedLogs, seedNotes, seedSummaries } from "@/lib/seed";
  * and persists to Firebase. Requires x-reset-secret header.
  */
 export async function POST(req: Request) {
+  const actor = getActorFromRequest(req);
+  if (!actor) return unauthorized();
+  if (actor.role !== "HR") return forbidden("관리자만 실행할 수 있습니다.");
+
+  if (process.env.ENABLE_ADMIN_RESET !== "true") {
+    return NextResponse.json(
+      { error: "이 환경에서는 초기화 기능이 비활성화되어 있습니다." },
+      { status: 403 },
+    );
+  }
+
   const secret = req.headers.get("x-reset-secret");
-  const expected = process.env.RESET_SECRET ?? "dev-reset";
-  if (secret !== expected) {
+  const expected = process.env.RESET_SECRET;
+  if (!expected || secret !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -23,7 +35,6 @@ export async function POST(req: Request) {
       notes: [...seedNotes],
       summaries: [...seedSummaries],
       leadershipAssessments: [],
-      meetings: [],
     }));
 
     return NextResponse.json({

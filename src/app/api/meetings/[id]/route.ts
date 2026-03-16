@@ -1,42 +1,51 @@
 import { NextResponse } from "next/server";
-import { db, ensureDbReady, mutateDbWithTransaction } from "@/lib/db";
+import { ensureDbReady } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
-import type { MeetingRecord, MeetingType } from "@/lib/types";
+import type { MeetingType } from "@/lib/types";
+import {
+  deleteMeeting,
+  getMeetingById,
+  patchMeeting,
+} from "@/lib/meetings-store";
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await ensureDbReady();
-  const actor = getActorFromRequest(req);
-  if (!actor) return unauthorized();
+  try {
+    await ensureDbReady();
+    const actor = getActorFromRequest(req);
+    if (!actor) return unauthorized();
 
-  const { id } = await params;
-  const meetings = Array.isArray(db.meetings) ? db.meetings : [];
-  const meeting = meetings.find((m) => m.id === id);
-  if (!meeting) return NextResponse.json({ error: "면담 기록을 찾을 수 없습니다." }, { status: 404 });
-  if (actor.role === "MANAGER" && meeting.managerId !== actor.id) {
-    return forbidden("본인 면담 기록만 조회할 수 있습니다.");
+    const { id } = await params;
+    const meeting = await getMeetingById(id);
+    if (!meeting) return NextResponse.json({ error: "면담 기록을 찾을 수 없습니다." }, { status: 404 });
+    if (actor.role === "MANAGER" && meeting.managerId !== actor.id) {
+      return forbidden("본인 면담 기록만 조회할 수 있습니다.");
+    }
+    return NextResponse.json({ item: meeting });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "면담 기록 조회 실패";
+    return NextResponse.json({ error: msg }, { status: 503 });
   }
-  return NextResponse.json({ item: meeting });
 }
 
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await ensureDbReady();
-  const actor = getActorFromRequest(req);
-  if (!actor) return unauthorized();
-  if (actor.role !== "MANAGER") return forbidden("팀장만 면담 기록을 수정할 수 있습니다.");
+  try {
+    await ensureDbReady();
+    const actor = getActorFromRequest(req);
+    if (!actor) return unauthorized();
+    if (actor.role !== "MANAGER") return forbidden("팀장만 면담 기록을 수정할 수 있습니다.");
 
-  const { id } = await params;
-  const meetings = Array.isArray(db.meetings) ? db.meetings : [];
-  const existing = meetings.find((m) => m.id === id);
-  if (!existing) return NextResponse.json({ error: "면담 기록을 찾을 수 없습니다." }, { status: 404 });
-  if (existing.managerId !== actor.id) {
-    return forbidden("본인 면담 기록만 수정할 수 있습니다.");
-  }
+    const { id } = await params;
+    const existing = await getMeetingById(id);
+    if (!existing) return NextResponse.json({ error: "면담 기록을 찾을 수 없습니다." }, { status: 404 });
+    if (existing.managerId !== actor.id) {
+      return forbidden("본인 면담 기록만 수정할 수 있습니다.");
+    }
 
   let body: {
     meetingType?: MeetingType;
@@ -59,48 +68,51 @@ export async function PATCH(
     return NextResponse.json({ error: "주요 논의 내용은 필수입니다." }, { status: 400 });
   }
 
-  const now = new Date().toISOString();
-  await mutateDbWithTransaction((state) => {
-    const meetings = Array.isArray(state.meetings) ? [...state.meetings] : [];
-    const idx = meetings.findIndex((m) => m.id === id);
-    if (idx === -1) return state;
-    const m = meetings[idx];
-    if (body.meetingType !== undefined) m.meetingType = body.meetingType;
-    if (body.meetingDate !== undefined) m.meetingDate = body.meetingDate;
-    if (body.goalSummary !== undefined) m.goalSummary = body.goalSummary;
-    if (body.discussionNotes !== undefined) m.discussionNotes = body.discussionNotes;
-    if (body.managerComment !== undefined) m.managerComment = body.managerComment;
-    if (body.supportNeeded !== undefined) m.supportNeeded = body.supportNeeded;
-    if (body.actionItems !== undefined) m.actionItems = body.actionItems;
-    if (body.nextMeetingDate !== undefined) m.nextMeetingDate = body.nextMeetingDate;
-    if (body.aiSummary !== undefined) m.aiSummary = body.aiSummary;
-    m.updatedAt = now;
-    return { ...state, meetings };
-  });
-  return NextResponse.json({ ok: true });
+    const now = new Date().toISOString();
+    const updated = await patchMeeting(id, {
+      ...(body.meetingType !== undefined ? { meetingType: body.meetingType } : {}),
+      ...(body.meetingDate !== undefined ? { meetingDate: body.meetingDate } : {}),
+      ...(body.goalSummary !== undefined ? { goalSummary: body.goalSummary } : {}),
+      ...(body.discussionNotes !== undefined ? { discussionNotes: body.discussionNotes } : {}),
+      ...(body.managerComment !== undefined ? { managerComment: body.managerComment } : {}),
+      ...(body.supportNeeded !== undefined ? { supportNeeded: body.supportNeeded } : {}),
+      ...(body.actionItems !== undefined ? { actionItems: body.actionItems } : {}),
+      ...(body.nextMeetingDate !== undefined ? { nextMeetingDate: body.nextMeetingDate } : {}),
+      ...(body.aiSummary !== undefined ? { aiSummary: body.aiSummary } : {}),
+      updatedAt: now,
+    });
+    if (!updated) {
+      return NextResponse.json({ error: "면담 기록을 찾을 수 없습니다." }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "면담 기록 수정 실패";
+    return NextResponse.json({ error: msg }, { status: 503 });
+  }
 }
 
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await ensureDbReady();
-  const actor = getActorFromRequest(req);
-  if (!actor) return unauthorized();
-  if (actor.role !== "MANAGER") return forbidden("팀장만 면담 기록을 삭제할 수 있습니다.");
+  try {
+    await ensureDbReady();
+    const actor = getActorFromRequest(req);
+    if (!actor) return unauthorized();
+    if (actor.role !== "MANAGER") return forbidden("팀장만 면담 기록을 삭제할 수 있습니다.");
 
-  const { id } = await params;
-  const meetings = Array.isArray(db.meetings) ? db.meetings : [];
-  const idx = meetings.findIndex((m) => m.id === id);
-  if (idx === -1) return NextResponse.json({ error: "면담 기록을 찾을 수 없습니다." }, { status: 404 });
-  const existing = meetings[idx];
-  if (existing.managerId !== actor.id) {
-    return forbidden("본인 면담 기록만 삭제할 수 있습니다.");
+    const { id } = await params;
+    const existing = await getMeetingById(id);
+    if (!existing) return NextResponse.json({ error: "면담 기록을 찾을 수 없습니다." }, { status: 404 });
+    if (existing.managerId !== actor.id) {
+      return forbidden("본인 면담 기록만 삭제할 수 있습니다.");
+    }
+
+    const ok = await deleteMeeting(id);
+    if (!ok) return NextResponse.json({ error: "면담 기록을 찾을 수 없습니다." }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "면담 기록 삭제 실패";
+    return NextResponse.json({ error: msg }, { status: 503 });
   }
-
-  await mutateDbWithTransaction((state) => {
-    const meetings = Array.isArray(state.meetings) ? state.meetings.filter((m) => m.id !== id) : [];
-    return { ...state, meetings };
-  });
-  return NextResponse.json({ ok: true });
 }

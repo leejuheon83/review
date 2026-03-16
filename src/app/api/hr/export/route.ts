@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, ensureDbReady } from "@/lib/db";
 import { forbidden, getActorFromRequest, unauthorized } from "@/lib/auth";
+import { buildMeetingExportRows } from "@/lib/hr-export";
 
 function escapeCsv(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
@@ -28,6 +29,95 @@ export async function GET(req: Request) {
   const from = params.get("from");
   const to = params.get("to");
   const format = (params.get("format") || "csv").toLowerCase();
+  const target = (params.get("target") || "logs").toLowerCase();
+
+  if (target === "meetings") {
+    const rows = buildMeetingExportRows(db, {
+      teamId,
+      managerId,
+      employeeId,
+      from,
+      to,
+    });
+
+    if (format === "xls") {
+      const xmlHeader = `<?xml version="1.0" encoding="UTF-8"?>`;
+      const workbookOpen =
+        `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ` +
+        `xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">` +
+        `<Worksheet ss:Name="one-on-one-meetings"><Table>`;
+      const headerRow =
+        `<Row>` +
+        `<Cell><Data ss:Type="String">employee</Data></Cell>` +
+        `<Cell><Data ss:Type="String">meetingDate</Data></Cell>` +
+        `<Cell><Data ss:Type="String">manager</Data></Cell>` +
+        `<Cell><Data ss:Type="String">type</Data></Cell>` +
+        `<Cell><Data ss:Type="String">goalSummary</Data></Cell>` +
+        `<Cell><Data ss:Type="String">discussionNotes</Data></Cell>` +
+        `<Cell><Data ss:Type="String">managerComment</Data></Cell>` +
+        `<Cell><Data ss:Type="String">supportNeeded</Data></Cell>` +
+        `<Cell><Data ss:Type="String">actionItems</Data></Cell>` +
+        `<Cell><Data ss:Type="String">nextMeetingDate</Data></Cell>` +
+        `<Cell><Data ss:Type="String">aiSummary</Data></Cell>` +
+        `<Cell><Data ss:Type="String">createdAt</Data></Cell>` +
+        `</Row>`;
+      const bodyRows = rows
+        .map(
+          (r) =>
+            `<Row>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.employee)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.meetingDate)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.manager)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.type)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.goalSummary)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.discussionNotes)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.managerComment)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.supportNeeded)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.actionItems)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.nextMeetingDate)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.aiSummary)}</Data></Cell>` +
+            `<Cell><Data ss:Type="String">${escapeXml(r.createdAt)}</Data></Cell>` +
+            `</Row>`,
+        )
+        .join("");
+      const workbookClose = `</Table></Worksheet></Workbook>`;
+      const xls = [xmlHeader, workbookOpen, headerRow, bodyRows, workbookClose].join("");
+
+      return new NextResponse(xls, {
+        headers: {
+          "Content-Type": "application/vnd.ms-excel; charset=utf-8",
+          "Content-Disposition": "attachment; filename=one-on-one-meetings-by-employee.xls",
+        },
+      });
+    }
+
+    const header =
+      "employee,meetingDate,manager,type,goalSummary,discussionNotes,managerComment,supportNeeded,actionItems,nextMeetingDate,aiSummary,createdAt";
+    const csvRows = rows.map((r) =>
+      [
+        r.employee,
+        r.meetingDate,
+        r.manager,
+        r.type,
+        escapeCsv(r.goalSummary),
+        escapeCsv(r.discussionNotes),
+        escapeCsv(r.managerComment),
+        escapeCsv(r.supportNeeded),
+        escapeCsv(r.actionItems),
+        r.nextMeetingDate,
+        escapeCsv(r.aiSummary),
+        r.createdAt,
+      ].join(","),
+    );
+    const csv = [header, ...csvRows].join("\n");
+
+    return new NextResponse(csv, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": "attachment; filename=one-on-one-meetings-by-employee.csv",
+      },
+    });
+  }
 
   const rows = db.logs.filter((l) => {
     const manager = db.users.find((u) => u.id === l.managerId);

@@ -123,6 +123,8 @@ export default function HrDashboardPage() {
 
   const csvExportUrl = `/api/hr/export?teamId=${teamId}&managerId=${managerId}&employeeId=all&from=${from}&to=${to}&format=csv`;
   const excelExportUrl = `/api/hr/export?teamId=${teamId}&managerId=${managerId}&employeeId=all&from=${from}&to=${to}&format=xls`;
+  const meetingsCsvExportUrl = `/api/hr/export?target=meetings&teamId=${teamId}&managerId=${managerId}&employeeId=all&from=${from}&to=${to}&format=csv`;
+  const meetingsExcelExportUrl = `/api/hr/export?target=meetings&teamId=${teamId}&managerId=${managerId}&employeeId=all&from=${from}&to=${to}&format=xls`;
 
   const downloadWithAuth = async (url: string, filename: string) => {
     try {
@@ -313,7 +315,9 @@ export default function HrDashboardPage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-semibold text-slate-900">내보내기</h2>
-        <p className="mt-1 text-sm text-slate-600">기간/팀/팀장 필터를 적용한 후 CSV 또는 엑셀 파일로 다운로드하세요.</p>
+        <p className="mt-1 text-sm text-slate-600">
+          기간/팀/팀장 필터를 적용한 후 피드백 로그 또는 1:1 면담 기록을 다운로드하세요.
+        </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
@@ -328,6 +332,20 @@ export default function HrDashboardPage() {
             className="inline-block rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
           >
             CSV 다운로드
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadWithAuth(meetingsExcelExportUrl, "one-on-one-meetings-by-employee.xls")}
+            className="inline-block rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          >
+            1:1 면담 엑셀 다운로드(개인별)
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadWithAuth(meetingsCsvExportUrl, "one-on-one-meetings-by-employee.csv")}
+            className="inline-block rounded-xl bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-200"
+          >
+            1:1 면담 CSV 다운로드(개인별)
           </button>
         </div>
         {exportError ? <p className="mt-2 text-sm text-rose-600">{exportError}</p> : null}

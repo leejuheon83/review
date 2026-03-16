@@ -6,7 +6,7 @@ import { useActor } from "@/components/actor-provider";
 import { apiFetch } from "@/lib/client-api";
 import { createMeeting } from "@/lib/meetings";
 import { MOCK_TEAM_MEMBERS } from "@/lib/mockTeamMembers";
-import type { Employee } from "@/lib/types";
+import type { Employee, User } from "@/lib/types";
 import type { MeetingFormData } from "@/types/meeting";
 import { MeetingForm } from "@/components/meetings/MeetingForm";
 
@@ -14,21 +14,56 @@ export default function NewMeetingPage() {
   const { actor } = useActor();
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [managers, setManagers] = useState<User[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const managerId = actor?.id || "";
   const managerName = actor?.name || "";
 
   useEffect(() => {
-    apiFetch<{ items: Employee[] }>("/api/members")
-      .then((res) => setEmployees(res.items?.length ? res.items : MOCK_TEAM_MEMBERS))
-      .catch(() => setEmployees(MOCK_TEAM_MEMBERS));
-  }, []);
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const membersRes = await apiFetch<{ items: Employee[] }>("/api/members");
+        if (cancelled) return;
+        setEmployees(membersRes.items?.length ? membersRes.items : MOCK_TEAM_MEMBERS);
+      } catch {
+        if (!cancelled) setEmployees(MOCK_TEAM_MEMBERS);
+      }
+
+      if (actor?.role === "HR") {
+        try {
+          const managersRes = await apiFetch<{ items: User[] }>("/api/users");
+          if (!cancelled) setManagers(managersRes.items ?? []);
+        } catch {
+          if (!cancelled) setManagers([]);
+        }
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [actor?.role]);
 
   const handleSubmit = async (input: MeetingFormData) => {
     setSubmitError(null);
     try {
-      await createMeeting(input);
+      let payload = input;
+      if (actor?.role === "HR") {
+        const employee = employees.find((e) => e.id === input.employeeId);
+        if (!employee) {
+          setSubmitError("선택한 팀원을 찾을 수 없습니다.");
+          return;
+        }
+        const manager = managers.find((m) => m.id === employee.managerId);
+        payload = {
+          ...input,
+          managerId: employee.managerId,
+          managerName: manager?.name || "담당 팀장",
+        };
+      }
+      await createMeeting(payload);
       if (typeof window !== "undefined") {
         sessionStorage.setItem("meeting-toast", "면담 기록이 저장되었습니다.");
       }

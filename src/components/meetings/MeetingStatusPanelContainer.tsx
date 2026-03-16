@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useActor } from "@/components/actor-provider";
 import { apiFetch } from "@/lib/client-api";
 import { getMeetings } from "@/lib/meetings";
-import { MOCK_TEAM_MEMBERS } from "@/lib/mockTeamMembers";
 import type { Employee } from "@/lib/types";
 import type { Meeting } from "@/types/meeting";
 import { MeetingStatusPanel } from "./MeetingStatusPanel";
@@ -16,14 +15,9 @@ export function MeetingStatusPanelContainer() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const managerId = actor?.id || "";
-
-  useEffect(() => {
-    apiFetch<{ items: Employee[] }>("/api/members")
-      .then((res) => setEmployees(res.items?.length ? res.items : MOCK_TEAM_MEMBERS))
-      .catch(() => setEmployees(MOCK_TEAM_MEMBERS));
-  }, []);
 
   useEffect(() => {
     if (!managerId) {
@@ -32,12 +26,21 @@ export function MeetingStatusPanelContainer() {
     }
     let cancelled = false;
     setLoading(true);
-    getMeetings(managerId)
-      .then((res) => {
-        if (!cancelled) setMeetings(res);
+    setLoadError(null);
+    Promise.all([
+      apiFetch<{ items: Employee[] }>("/api/members"),
+      getMeetings(managerId),
+    ])
+      .then(([membersRes, meetingsRes]) => {
+        if (cancelled) return;
+        setEmployees(membersRes.items ?? []);
+        setMeetings(meetingsRes);
       })
-      .catch(() => {
-        if (!cancelled) setMeetings([]);
+      .catch((e) => {
+        if (cancelled) return;
+        setEmployees([]);
+        setMeetings([]);
+        setLoadError(e instanceof Error ? e.message : "면담 현황을 불러오지 못했습니다.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -66,6 +69,14 @@ export function MeetingStatusPanelContainer() {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <p className="text-sm text-slate-500">면담 현황 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+        <p className="text-sm text-rose-700">{loadError}</p>
       </div>
     );
   }

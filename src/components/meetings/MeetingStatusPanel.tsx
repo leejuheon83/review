@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Meeting } from "@/types/meeting";
 import { MEETING_TYPE_LABELS } from "@/types/meeting";
 import { formatMeetingDate } from "@/lib/meetings";
@@ -21,6 +22,8 @@ export function MeetingStatusPanel({
   recentMeetingCount,
   noRecentMeetingCount,
 }: MeetingStatusPanelProps) {
+  const router = useRouter();
+
   return (
     <div className="h-full rounded-xl border border-slate-200 bg-white p-4">
       <h3 className="text-lg font-semibold text-slate-900">1:1 면담 현황</h3>
@@ -59,12 +62,13 @@ export function MeetingStatusPanel({
           <p className="mt-2 text-sm text-slate-400">면담 기록이 없습니다.</p>
         )}
       </div>
-      <Link
-        href="/meetings"
-        className="mt-4 block text-center text-sm font-medium text-[#0070C9] hover:underline"
+      <button
+        type="button"
+        onClick={() => router.push("/meetings")}
+        className="mt-4 block w-full text-center text-sm font-medium text-[#0070C9] hover:underline"
       >
         1:1 면담 기록 보기
-      </Link>
+      </button>
     </div>
   );
 }

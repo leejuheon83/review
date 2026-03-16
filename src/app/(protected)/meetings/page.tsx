@@ -3,12 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useActor } from "@/components/actor-provider";
-import { apiFetch } from "@/lib/client-api";
 import { getMeetings, deleteMeeting } from "@/lib/meetings";
-import { MOCK_TEAM_MEMBERS } from "@/lib/mockTeamMembers";
-import type { Employee } from "@/lib/types";
 import type { Meeting, MeetingType } from "@/types/meeting";
-import { MEETING_TYPE_LABELS } from "@/types/meeting";
 import { MeetingList } from "@/components/meetings/MeetingList";
 
 const TYPE_FILTERS: { value: MeetingType | "all"; label: string }[] = [
@@ -22,7 +18,6 @@ const TYPE_FILTERS: { value: MeetingType | "all"; label: string }[] = [
 export default function MeetingsPage() {
   const { actor } = useActor();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<MeetingType | "all">("all");
@@ -40,20 +35,6 @@ export default function MeetingsPage() {
       return () => clearTimeout(t);
     }
   }, []);
-
-  useEffect(() => {
-    if (!managerId) return;
-    let cancelled = false;
-    apiFetch<{ items: Employee[] }>("/api/members")
-      .then((res) => {
-        if (!cancelled && res.items?.length) setEmployees(res.items);
-        else if (!cancelled) setEmployees(MOCK_TEAM_MEMBERS);
-      })
-      .catch(() => {
-        if (!cancelled) setEmployees(MOCK_TEAM_MEMBERS);
-      });
-    return () => { cancelled = true; };
-  }, [managerId]);
 
   useEffect(() => {
     if (!managerId) {
@@ -112,20 +93,16 @@ export default function MeetingsPage() {
     );
   }
 
-  const isHR = actor?.role === "HR";
-
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-slate-900">1:1 면담 기록</h1>
-        {!isHR && (
-          <Link
-            href="/meetings/new"
-            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#0070C9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0059A8]"
-          >
-            면담 기록 작성
-          </Link>
-        )}
+        <Link
+          href="/meetings/new"
+          className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[#0070C9] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0059A8]"
+        >
+          면담 기록 작성
+        </Link>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -173,7 +150,7 @@ export default function MeetingsPage() {
       ) : (
         <MeetingList
           meetings={filteredMeetings}
-          onDelete={isHR ? undefined : handleDeleteMeeting}
+          onDelete={actor?.role === "HR" ? undefined : handleDeleteMeeting}
         />
       )}
     </div>

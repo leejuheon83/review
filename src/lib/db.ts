@@ -6,12 +6,7 @@ import {
   seedTeams,
   seedUsers,
 } from "@/lib/seed";
-import { getFirestoreAdmin, getRtdbRef, isFirebaseEnabled } from "@/lib/firebase-admin";
-import {
-  isGoogleSheetsEnabled,
-  readDbStateFromSheets,
-  writeDbStateToSheets,
-} from "@/lib/google-sheets-db";
+import { getRtdbRef } from "@/lib/firebase-admin";
 import type {
   Employee,
   FeedbackLog,
@@ -34,11 +29,10 @@ type DBState = {
   meetings: MeetingRecord[];
 };
 
-const FIRESTORE_COLLECTION = "coaching_log";
-const FIRESTORE_DOC_ID = "state_main";
 const RTDB_STATE_PATH = "coaching_log/state_main";
 
 function clone<T>(value: T): T {
+  if (value === undefined || value === null) return value;
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
@@ -76,89 +70,88 @@ if (!Array.isArray(dbRef.meetings)) dbRef.meetings = [];
 export const db: DBState = dbRef;
 
 function applyState(state: DBState) {
-  db.users = clone(state.users);
-  db.teams = clone(state.teams);
-  db.employees = clone(state.employees);
-  db.logs = clone(state.logs);
-  db.notes = clone(state.notes);
-  db.summaries = clone(state.summaries);
+  db.users = clone(Array.isArray(state.users) ? state.users : []);
+  db.teams = clone(Array.isArray(state.teams) ? state.teams : []);
+  db.employees = clone(Array.isArray(state.employees) ? state.employees : []);
+  db.logs = clone(Array.isArray(state.logs) ? state.logs : []);
+  db.notes = clone(Array.isArray(state.notes) ? state.notes : []);
+  db.summaries = clone(Array.isArray(state.summaries) ? state.summaries : []);
   db.leadershipAssessments = clone(
     Array.isArray(state.leadershipAssessments) ? state.leadershipAssessments : [],
   );
   db.meetings = clone(Array.isArray(state.meetings) ? state.meetings : []);
 }
 
-async function loadFromPrimary(): Promise<void> {
-    const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
-    if (rtdbRef) {
-      try {
-        const snap = await rtdbRef.get();
-        const remote = snap.val() as DBState | null;
-        if (remote) {
-          applyState(remote);
-          return;
-        }
-        await rtdbRef.set(clone(db));
-        return;
-      } catch {
-        // RTDB 실패 시 다음 소스 시도
-      }
+async function readStateFromRTDB(): Promise<DBState | null> {
+  const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
+  if (rtdbRef) {
+    try {
+      const snap = await rtdbRef.get();
+      return (snap.val() as DBState | null) ?? null;
+    } catch {
+      // Admin SDK RTDB read 실패 시 REST 폴백
     }
+  }
 
-    const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
-    if (rtdbUrl) {
-      const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
-      const stateUrl = `${base}/${RTDB_STATE_PATH}.json`;
-      try {
-        const res = await fetch(stateUrl, { method: "GET" });
-        if (res.ok) {
-          const remote = (await res.json()) as DBState | null;
-          if (remote) {
-            applyState(remote);
-            return;
-          }
-        }
-      } catch {
-        // REST 실패 시 다음 소스 시도
-      }
-    }
-
-    if (isFirebaseEnabled()) {
-      const firestore = getFirestoreAdmin();
-      if (firestore) {
-        try {
-          const ref = firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID);
-          const snap = await ref.get();
-          if (snap.exists) {
-            const data = snap.data() as DBState | undefined;
-            if (data) {
-              applyState(data);
-              return;
-            }
-          }
-        } catch {
-          // Firestore 실패 시 다음 소스 시도
-        }
-      }
-    }
-
-    if (isGoogleSheetsEnabled()) {
-      try {
-        const remote = await readDbStateFromSheets();
-        if (remote) {
-          applyState(remote);
-          return;
-        }
-      } catch {
-        // fall through
-      }
-    }
+  const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
+  if (!rtdbUrl) return null;
+  try {
+    const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
+    const stateUrl = `${base}/${RTDB_STATE_PATH}.json`;
+    const res = await fetch(stateUrl, { method: "GET" });
+    if (!res.ok) return null;
+    return (await res.json()) as DBState | null;
+  } catch {
+    return null;
+  }
 }
 
-/**
- * Load order: RTDB first, then REST, Firestore, Google Sheets.
- * Uses short TTL cache (2s) so reads see recent writes from other instances.
- */
+async function writeStateToRTDB(state: DBState): Promise<void> {
+  const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
+  if (rtdbRef) {
+    try {
+      await rtdbRef.set(state);
+      return;
+    } catch {
+      // Admin SDK RTDB write 실패 시 REST 폴백
+    }
+  }
+
+  const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
+  if (!rtdbUrl) {
+    return;
+  }
+  try {
+    const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
+    const stateUrl = `${base}/${RTDB_STATE_PATH}.json`;
+    const res = await fetch(stateUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`RTDB 저장 실패 (${res.status}): ${text.slice(0, 200)}`);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "RTDB 저장 실패";
+    throw new Error(msg);
+  }
+}
+
+async function loadFromPrimary(): Promise<void> {
+  const remote = await readStateFromRTDB();
+  if (remote) {
+    applyState(remote);
+    return;
+  }
+  try {
+    await writeStateToRTDB(clone(db));
+  } catch {
+    // 저장소 초기화 실패 시 메모리 시드 상태 유지
+  }
+}
+
 export async function ensureDbReady(): Promise<void> {
   const now = Date.now();
   const loadedAt = globalForDBLoadedAt.coachingLogDBLoadedAt ?? 0;
@@ -173,190 +166,31 @@ export async function ensureDbReady(): Promise<void> {
   await globalForDBReady.coachingLogDBReady;
 }
 
-/**
- * Atomically mutate DB state. Prevents serverless race condition where multiple
- * instances overwrite each other (read-modify-write). Uses RTDB transaction
- * first, then Firestore transaction, then reload+persist as last resort.
- */
 export async function mutateDbWithTransaction(
   updater: (state: DBState) => DBState,
 ): Promise<void> {
   const seed = createSeedState();
-
   const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
   if (rtdbRef) {
-    try {
-      const result = await rtdbRef.transaction((current) => {
-        const base = (current as DBState | null) || seed;
-        return updater(clone(base));
-      });
-      if (result.committed) {
-        const committed = result.snapshot.val() as DBState;
-        applyState(committed);
-        await syncToSecondary(committed);
-        return;
-      }
-    } catch {
-      // RTDB transaction failed, try Firestore
+    const result = await rtdbRef.transaction((current) => {
+      const base = (current as DBState | null) || seed;
+      return updater(clone(base));
+    });
+    if (!result.committed) {
+      throw new Error("RTDB 트랜잭션 커밋에 실패했습니다.");
     }
+    const committed = result.snapshot.val() as DBState;
+    applyState(committed);
+    return;
   }
 
-  const firestore = getFirestoreAdmin();
-  if (firestore) {
-    try {
-      const docRef = firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID);
-      const next = await firestore.runTransaction(async (transaction) => {
-        const snap = await transaction.get(docRef);
-        const current = snap.exists ? (snap.data() as DBState) : null;
-        const base = current || seed;
-        const updated = updater(clone(base));
-        transaction.set(docRef, updated);
-        return updated;
-      });
-      applyState(next);
-      await syncToSecondary(next);
-      return;
-    } catch {
-      // Firestore transaction failed
-    }
-  }
-
-  await reloadFromPrimary();
+  await ensureDbReady();
   const next = updater(clone(db));
   applyState(next);
-  await persistDbState();
-}
-
-async function reloadFromPrimary(): Promise<void> {
-  const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
-  if (rtdbRef) {
-    try {
-      const snap = await rtdbRef.get();
-      const remote = snap.val() as DBState | null;
-      if (remote) {
-        applyState(remote);
-        return;
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
-  if (rtdbUrl) {
-    try {
-      const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
-      const res = await fetch(`${base}/${RTDB_STATE_PATH}.json`, { method: "GET" });
-      if (res.ok) {
-        const remote = (await res.json()) as DBState | null;
-        if (remote) {
-          applyState(remote);
-          return;
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  const firestore = getFirestoreAdmin();
-  if (firestore) {
-    try {
-      const snap = await firestore
-        .collection(FIRESTORE_COLLECTION)
-        .doc(FIRESTORE_DOC_ID)
-        .get();
-      if (snap.exists) {
-        const data = snap.data() as DBState | undefined;
-        if (data) {
-          applyState(data);
-          return;
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  if (isGoogleSheetsEnabled()) {
-    try {
-      const remote = await readDbStateFromSheets();
-      if (remote) {
-        applyState(remote);
-      }
-    } catch {
-      // ignore
-    }
-  }
-}
-
-async function syncToSecondary(state: DBState): Promise<void> {
-  const s = clone(state);
-  const tasks: Promise<unknown>[] = [];
-  const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
-  if (rtdbRef) tasks.push(rtdbRef.set(s));
-  const firestore = getFirestoreAdmin();
-  if (firestore) {
-    tasks.push(
-      firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID).set(s),
-    );
-  }
-  if (isGoogleSheetsEnabled()) tasks.push(writeDbStateToSheets(s));
-  await Promise.allSettled(tasks);
+  await writeStateToRTDB(next);
 }
 
 export async function persistDbState(): Promise<void> {
   const state = clone(db);
-
-  if (isFirebaseEnabled()) {
-    const firestore = getFirestoreAdmin();
-    if (firestore) {
-      try {
-        await firestore.collection(FIRESTORE_COLLECTION).doc(FIRESTORE_DOC_ID).set(state);
-        if (isGoogleSheetsEnabled()) {
-          writeDbStateToSheets(state).catch(() => {});
-        }
-        return;
-      } catch {
-        // Firestore 저장 실패 시 RTDB 폴백
-      }
-    }
-  }
-
-  const rtdbRef = getRtdbRef(RTDB_STATE_PATH);
-  if (rtdbRef) {
-    await rtdbRef.set(state);
-    if (isGoogleSheetsEnabled()) {
-      writeDbStateToSheets(state).catch(() => {});
-    }
-    return;
-  }
-
-  const rtdbUrl = process.env.FIREBASE_DATABASE_URL;
-  if (rtdbUrl) {
-    const base = rtdbUrl.endsWith("/") ? rtdbUrl.slice(0, -1) : rtdbUrl;
-    const stateUrl = `${base}/${RTDB_STATE_PATH}.json`;
-    const res = await fetch(stateUrl, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state),
-    });
-    if (res.ok) {
-      if (isGoogleSheetsEnabled()) {
-        writeDbStateToSheets(state).catch(() => {});
-      }
-      return;
-    }
-    const text = await res.text();
-    throw new Error(`DB 저장 실패 (${res.status}): ${text.slice(0, 200)}`);
-  }
-
-  if (isGoogleSheetsEnabled()) {
-    await writeDbStateToSheets(state);
-    return;
-  }
-
-  throw new Error(
-    "DB 저장소가 설정되지 않았습니다. Vercel 환경변수에 FIREBASE_SERVICE_ACCOUNT_JSON(또는 FIREBASE_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY)과 FIREBASE_DATABASE_URL, 또는 GOOGLE_SPREADSHEET_ID를 추가해주세요.",
-  );
+  await writeStateToRTDB(state);
 }
